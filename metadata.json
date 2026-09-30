@@ -1,0 +1,6 @@
+{
+  "name": "Clinic Flow CRM",
+  "description": "Healthcare CRM for dental and aesthetic clinics with automated lead triage, live inbox, appointment scheduling, and n8n webhook API.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
