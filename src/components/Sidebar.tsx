@@ -45,6 +45,7 @@ export const Sidebar: React.FC = () => {
   }
 
   const unreadCount = conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
+  const humanHandoverCount = conversations.filter((c) => c.mode === 'human').length;
   const pendingFollowups = followups.filter((f) => f.status === 'pending').length;
   const activeAppointments = appointments.filter((a) => a.status === 'confirmed').length;
   const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin';
@@ -77,6 +78,7 @@ export const Sidebar: React.FC = () => {
       label: 'Live Inbox',
       icon: MessageSquare,
       count: unreadCount > 0 ? unreadCount : undefined,
+      alertCount: humanHandoverCount > 0 ? humanHandoverCount : undefined,
     },
     {
       id: 'leads' as const,
@@ -234,6 +236,15 @@ export const Sidebar: React.FC = () => {
                 </div>
 
                 <div className="flex items-center space-x-1.5">
+                  {item.alertCount !== undefined && (
+                    <span
+                      className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse shadow-xs flex items-center gap-0.5"
+                      title="Human Handover Alerts"
+                    >
+                      <span>🚨</span>
+                      <span>{item.alertCount}</span>
+                    </span>
+                  )}
                   {item.count !== undefined && (
                     <span
                       className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${

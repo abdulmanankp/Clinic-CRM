@@ -9,6 +9,8 @@ import {
   Followup,
   ActivityEvent,
   AppointmentStatus,
+  StaffUser,
+  UserRole,
 } from '../src/types/crm.ts';
 
 // Initial Clinic Settings
@@ -141,10 +143,50 @@ const defaultKB: KBEntry[] = [
   },
 ];
 
+export const defaultStaffUsers: StaffUser[] = [
+  {
+    id: 'user-abdul-manan',
+    name: 'Abdul Manan',
+    email: 'abdulmanankp0@gmail.com',
+    role: 'super_admin',
+    password: 'Manana!@1234',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    created_at: '2026-01-01',
+  },
+  {
+    id: 'user-super-admin',
+    name: 'Dr. Tariq Mansoor',
+    email: 'tariq.mansoor@democlinic.ae',
+    role: 'admin',
+    password: 'ClinicAdmin2026!',
+    avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80',
+    created_at: '2026-01-01',
+  },
+  {
+    id: 'user-admin',
+    name: 'Dr. Sarah Al-Mansoori',
+    email: 'sarah.mansoori@democlinic.ae',
+    role: 'admin',
+    password: 'ClinicAdmin2026!',
+    avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80',
+    created_at: '2026-01-15',
+  },
+  {
+    id: 'user-staff',
+    name: 'Layla Al-Amiri',
+    email: 'layla.amiri@democlinic.ae',
+    role: 'staff',
+    password: 'StaffLayla2026!',
+    avatar: 'https://images.unsplash.com/photo-1594824813572-c2e8c2a80693?w=150&auto=format&fit=crop&q=80',
+    created_at: '2026-02-01',
+  },
+];
+
 class ClinicDatabase {
   settings: ClinicSettings = JSON.parse(JSON.stringify(defaultSettings));
   treatments: Treatment[] = JSON.parse(JSON.stringify(defaultTreatments));
   kb_entries: KBEntry[] = JSON.parse(JSON.stringify(defaultKB));
+  staff_users: StaffUser[] = JSON.parse(JSON.stringify(defaultStaffUsers));
   leads: Lead[] = [];
   conversations: Conversation[] = [];
   messages: Message[] = [];
@@ -154,6 +196,80 @@ class ClinicDatabase {
 
   constructor() {
     this.seedDemoData();
+  }
+
+  // --- DATABASE AUTHENTICATION ---
+  authenticateUser(
+    email: string,
+    pass: string
+  ): { ok: boolean; user?: Omit<StaffUser, 'password'>; error?: string } {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const user = this.staff_users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (!user) {
+      return {
+        ok: false,
+        error: 'Database Authentication Error: No registered staff record found with this email.',
+      };
+    }
+
+    if (user.password && user.password !== pass) {
+      return {
+        ok: false,
+        error: 'Database Authentication Error: Incorrect password credentials.',
+      };
+    }
+
+    // Do not return plain password to client
+    const { password, ...safeUser } = user;
+    this.logActivity(
+      'message_received',
+      `Staff Authenticated in Database: ${safeUser.name}`,
+      `Role: ${safeUser.role.toUpperCase()} (${safeUser.email})`
+    );
+
+    return { ok: true, user: safeUser };
+  }
+
+  getStaffUsers(): Omit<StaffUser, 'password'>[] {
+    return this.staff_users.map(({ password, ...u }) => u);
+  }
+
+  createStaffUser(userData: {
+    name: string;
+    email: string;
+    role: UserRole;
+    password?: string;
+  }): Omit<StaffUser, 'password'> {
+    const newUser: StaffUser = {
+      id: 'user-' + Math.random().toString(36).substring(2, 9),
+      name: userData.name,
+      email: userData.email.trim().toLowerCase(),
+      role: userData.role,
+      password: userData.password || 'Clinic2026!',
+      avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`,
+      created_at: new Date().toISOString().slice(0, 10),
+    };
+    this.staff_users.push(newUser);
+    this.logActivity('lead_new', `New Staff User Created: ${newUser.name}`, `Role: ${newUser.role}`);
+    const { password, ...safe } = newUser;
+    return safe;
+  }
+
+  updateStaffUserRole(id: string, role: UserRole): boolean {
+    const user = this.staff_users.find((u) => u.id === id);
+    if (!user) return false;
+    user.role = role;
+    this.logActivity('lead_new', `Staff Role Updated: ${user.name}`, `New Role: ${role}`);
+    return true;
+  }
+
+  deleteStaffUser(id: string): boolean {
+    const idx = this.staff_users.findIndex((u) => u.id === id);
+    if (idx === -1) return false;
+    const removed = this.staff_users.splice(idx, 1)[0];
+    this.logActivity('lead_new', `Staff User Deleted: ${removed.name}`, `Email: ${removed.email}`);
+    return true;
   }
 
   // Helper: check working hours for a given ISO date string
@@ -574,6 +690,7 @@ class ClinicDatabase {
     this.appointments = [];
     this.followups = [];
     this.activities = [];
+    this.staff_users = JSON.parse(JSON.stringify(defaultStaffUsers));
 
     const now = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;

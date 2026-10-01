@@ -172,26 +172,39 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const login = async (email: string, pass: string): Promise<{ ok: boolean; error?: string }> => {
-    const cleanEmail = email.trim().toLowerCase();
-    const user = staffUsers.find((u) => u.email.toLowerCase() === cleanEmail);
-
-    if (!user) {
-      return { ok: false, error: 'No account found with this email address.' };
-    }
-
-    if (user.password && user.password !== pass) {
-      return { ok: false, error: 'Incorrect password. Please try again.' };
-    }
-
-    // Success
-    setCurrentUser(user);
-    setIsAuthenticated(true);
     try {
-      localStorage.setItem('clinicflow_auth_user', JSON.stringify(user));
-      localStorage.setItem('clinicflow_is_authenticated', 'true');
-    } catch {}
-    showToast(`Welcome back, ${user.name}!`, 'success');
-    return { ok: true };
+      const cleanEmail = email.trim().toLowerCase();
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: pass }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        return {
+          ok: false,
+          error: data.error || 'Database Authentication Failed: Please check your credentials.',
+        };
+      }
+
+      // Authenticated directly via backend database
+      const verifiedUser: StaffUser = data.user;
+      setCurrentUser(verifiedUser);
+      setIsAuthenticated(true);
+      try {
+        localStorage.setItem('clinicflow_auth_user', JSON.stringify(verifiedUser));
+        localStorage.setItem('clinicflow_is_authenticated', 'true');
+      } catch {}
+
+      showToast(`Welcome back, ${verifiedUser.name}! (Authenticated via Database)`, 'success');
+      return { ok: true };
+    } catch (err: any) {
+      return {
+        ok: false,
+        error: 'Database server unreachable: ' + (err.message || 'Network error'),
+      };
+    }
   };
 
   const logout = () => {
@@ -216,6 +229,9 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAppointments(data.appointments);
         setFollowups(data.followups);
         setActivities(data.activities);
+        if (data.staff_users) {
+          setStaffUsers(data.staff_users);
+        }
       }
     } catch (err) {
       console.error('Error refreshing CRM bundle:', err);
@@ -462,37 +478,64 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const createStaffUser = (userData: { name: string; email: string; role: UserRole }) => {
-    const newUser: StaffUser = {
-      id: 'user-' + Math.random().toString(36).substring(2, 9),
-      name: userData.name,
-      email: userData.email,
-      role: userData.role,
-      avatar:
-        userData.role === 'staff'
-          ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-      created_at: new Date().toISOString().slice(0, 10),
-    };
-    setStaffUsers((prev) => [...prev, newUser]);
-    showToast(`User ${newUser.name} created as ${newUser.role}`, 'success');
-  };
-
-  const updateStaffUserRole = (id: string, role: UserRole) => {
-    setStaffUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)));
-    if (currentUser.id === id) {
-      setCurrentUser((prev) => ({ ...prev, role }));
+  const createStaffUser = async (userData: {
+    name: string;
+    email: string;
+    role: UserRole;
+    password?: string;
+  }) => {
+    try {
+      const res = await fetch('/api/staff-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+      if (res.ok) {
+        await refreshData();
+        showToast(`Staff member ${userData.name} created in database`, 'success');
+      } else {
+        showToast('Failed to create staff member in database', 'error');
+      }
+    } catch {
+      showToast('Error connecting to database', 'error');
     }
-    showToast('Role updated', 'success');
   };
 
-  const deleteStaffUser = (id: string) => {
+  const updateStaffUserRole = async (id: string, role: UserRole) => {
+    try {
+      const res = await fetch(`/api/staff-users/${id}/role`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      if (res.ok) {
+        await refreshData();
+        if (currentUser.id === id) {
+          setCurrentUser((prev) => ({ ...prev, role }));
+        }
+        showToast('User role updated in database', 'success');
+      }
+    } catch {
+      showToast('Failed to update role in database', 'error');
+    }
+  };
+
+  const deleteStaffUser = async (id: string) => {
     if (currentUser.id === id) {
       showToast('Cannot delete currently active user', 'error');
       return;
     }
-    setStaffUsers((prev) => prev.filter((u) => u.id !== id));
-    showToast('User deleted', 'info');
+    try {
+      const res = await fetch(`/api/staff-users/${id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        await refreshData();
+        showToast('Staff user deleted from database', 'info');
+      }
+    } catch {
+      showToast('Failed to delete user from database', 'error');
+    }
   };
 
   return (

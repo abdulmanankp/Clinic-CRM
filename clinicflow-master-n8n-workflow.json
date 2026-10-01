@@ -12,23 +12,53 @@
       "name": "Incoming Patient Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [180, 420],
+      "position": [160, 420],
       "webhookId": "clinic-inbound"
     },
     {
       "parameters": {
-        "jsCode": "// 1. Normalize incoming payload from WhatsApp (AiSensy / Meta / Twilio) or Web Chat\nconst data = $input.first().json;\nconst body = data.body || data;\n\n// Extract phone number (sanitized to E.164)\nlet rawPhone = body.phone || body.mobile || body.from || body.wa_id || body.recipient_id || '+971501234567';\nlet phone = String(rawPhone).trim();\nif (!phone.startsWith('+')) {\n  phone = '+' + phone.replace(/\\D/g, '');\n}\n\n// Extract patient name\nconst name = body.name || body.sender_name || body.profile_name || 'Valued Patient';\n\n// Extract message text\nconst text = String(body.message || body.text || body.body || body.message_text || '').trim();\nconst lower = text.toLowerCase();\n\n// Extract channel\nconst channel = (body.channel || 'whatsapp').toLowerCase();\n\n// 2. Intelligent Keyword & Intent Detection\nlet intent = 'greeting';\nlet treatmentInterest = 'General Consultation';\n\n// A. Emergency triage keywords\nconst emergencyKeywords = ['bleeding', 'severe pain', 'swelling', 'accident', 'emergency', 'acute trauma', 'cannot breathe', 'نزيف', 'طوارئ', 'ألم شديد', 'حادث'];\nif (emergencyKeywords.some(kw => lower.includes(kw))) {\n  intent = 'emergency';\n}\n// B. Human handover keywords\nelse if (['human', 'agent', 'doctor', 'operator', 'receptionist', 'speak to someone', 'talk to person', 'call me', 'موظف', 'طبيب', 'انسان', 'تحدث مع'].some(kw => lower.includes(kw))) {\n  intent = 'handover';\n}\n// C. Booking keywords\nelse if (['book', 'appointment', 'schedule', 'reserve', 'whitening', 'botox', 'cleaning', 'invisalign', 'consultation', 'teeth', 'filler', 'حجز', 'موعد', 'تبييض', 'تنظيف', 'بوتوكس'].some(kw => lower.includes(kw))) {\n  intent = 'booking';\n  if (lower.includes('whitening') || lower.includes('تبييض')) treatmentInterest = 'Zoom Teeth Whitening';\n  else if (lower.includes('botox') || lower.includes('بوتوكس')) treatmentInterest = 'Botox Injections';\n  else if (lower.includes('invisalign')) treatmentInterest = 'Invisalign Consultation';\n  else if (lower.includes('cleaning') || lower.includes('تنظيف')) treatmentInterest = 'Routine Dental Hygiene';\n}\n// D. Pricing keywords\nelse if (['price', 'cost', 'how much', 'rate', 'aed', 'fees', 'سعر', 'كم سعر', 'تكلفة', 'اسعار'].some(kw => lower.includes(kw))) {\n  intent = 'pricing';\n}\n// E. Location / Hours keywords\nelse if (['hours', 'location', 'open', 'where', 'address', 'marina', 'موقع', 'ساعات', 'مكان', 'عنوان'].some(kw => lower.includes(kw))) {\n  intent = 'info';\n}\n\nreturn [{\n  json: {\n    phone,\n    name,\n    text,\n    channel,\n    intent,\n    treatment_interest: treatmentInterest,\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "values": {
+          "string": [
+            {
+              "name": "CRM_BASE_URL",
+              "value": "https://clinic.wovextech.com"
+            },
+            {
+              "name": "CRM_API_KEY",
+              "value": "crm_live_secret_key_12345"
+            },
+            {
+              "name": "SUPABASE_TOKEN",
+              "value": "Bearer IsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm"
+            },
+            {
+              "name": "AISENSY_API_KEY",
+              "value": "YOUR_AISENSY_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-workflow-config",
+      "name": "Workflow Settings (Edit Keys Here)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [380, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Normalize incoming payload from WhatsApp (AiSensy / Meta / Twilio) or Web Chat\nconst webhookData = $('Incoming Patient Webhook').item.json;\nconst body = webhookData.body || webhookData;\n\n// Extract phone number (sanitized to E.164)\nlet rawPhone = body.phone || body.mobile || body.from || body.wa_id || body.recipient_id || '+971501234567';\nlet phone = String(rawPhone).trim();\nif (!phone.startsWith('+')) {\n  phone = '+' + phone.replace(/\\D/g, '');\n}\n\n// Extract patient name\nconst name = body.name || body.sender_name || body.profile_name || 'Valued Patient';\n\n// Extract message text\nconst text = String(body.message || body.text || body.body || body.message_text || '').trim();\nconst lower = text.toLowerCase();\n\n// Extract channel\nconst channel = (body.channel || 'whatsapp').toLowerCase();\n\n// 2. Intelligent Keyword & Intent Detection\nlet intent = 'greeting';\nlet treatmentInterest = 'General Consultation';\n\n// A. Emergency triage keywords\nconst emergencyKeywords = ['bleeding', 'severe pain', 'swelling', 'accident', 'emergency', 'acute trauma', 'cannot breathe', 'نزيف', 'طوارئ', 'ألم شديد', 'حادث'];\nif (emergencyKeywords.some(kw => lower.includes(kw))) {\n  intent = 'emergency';\n}\n// B. Human handover keywords\nelse if (['human', 'agent', 'doctor', 'operator', 'receptionist', 'speak to someone', 'talk to person', 'call me', 'موظف', 'طبيب', 'انسان', 'تحدث مع'].some(kw => lower.includes(kw))) {\n  intent = 'handover';\n}\n// C. Booking keywords\nelse if (['book', 'appointment', 'schedule', 'reserve', 'whitening', 'botox', 'cleaning', 'invisalign', 'consultation', 'teeth', 'filler', 'حجز', 'موعد', 'تبييض', 'تنظيف', 'بوتوكس'].some(kw => lower.includes(kw))) {\n  intent = 'booking';\n  if (lower.includes('whitening') || lower.includes('تبييض')) treatmentInterest = 'Zoom Teeth Whitening';\n  else if (lower.includes('botox') || lower.includes('بوتوكس')) treatmentInterest = 'Botox Injections';\n  else if (lower.includes('invisalign')) treatmentInterest = 'Invisalign Consultation';\n  else if (lower.includes('cleaning') || lower.includes('تنظيف')) treatmentInterest = 'Routine Dental Hygiene';\n}\n// D. Pricing keywords\nelse if (['price', 'cost', 'how much', 'rate', 'aed', 'fees', 'سعر', 'كم سعر', 'تكلفة', 'اسعار'].some(kw => lower.includes(kw))) {\n  intent = 'pricing';\n}\n// E. Location / Hours keywords\nelse if (['hours', 'location', 'open', 'where', 'address', 'marina', 'موقع', 'ساعات', 'مكان', 'عنوان'].some(kw => lower.includes(kw))) {\n  intent = 'info';\n}\n\nreturn [{\n  json: {\n    phone,\n    name,\n    text,\n    channel,\n    intent,\n    treatment_interest: treatmentInterest,\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
       "id": "node-normalize-parse",
       "name": "Normalize & Parse Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [420, 420]
+      "position": [600, 420]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/upsert-lead",
+        "url": "https://clinic.wovextech.com/api/upsert-lead",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -38,25 +68,29 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+              "value": "crm_live_secret_key_12345"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer IsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"phone\": \"{{ $('Normalize & Parse Message').item.json.phone }}\",\n  \"name\": \"{{ $('Normalize & Parse Message').item.json.name }}\",\n  \"channel\": \"{{ $('Normalize & Parse Message').item.json.channel }}\",\n  \"treatment_interest\": \"{{ $('Normalize & Parse Message').item.json.treatment_interest }}\",\n  \"source\": \"WhatsApp Automation (n8n)\"\n}",
+        "jsonBody": "={{ JSON.stringify({\n  phone: $('Normalize & Parse Message').item.json.phone,\n  name: $('Normalize & Parse Message').item.json.name,\n  channel: $('Normalize & Parse Message').item.json.channel,\n  treatment_interest: $('Normalize & Parse Message').item.json.treatment_interest,\n  source: 'WhatsApp Automation (n8n)'\n}) }}",
         "options": {}
       },
       "id": "node-upsert-lead",
       "name": "Upsert Lead in CRM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 420]
+      "position": [820, 420]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/log-message",
+        "url": "https://clinic.wovextech.com/api/log-message",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -66,20 +100,24 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+              "value": "crm_live_secret_key_12345"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer IsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": \"{{ $('Upsert Lead in CRM').item.json.lead_id }}\",\n  \"direction\": \"in\",\n  \"sender\": \"patient\",\n  \"channel\": \"{{ $('Normalize & Parse Message').item.json.channel }}\",\n  \"text\": \"{{ $('Normalize & Parse Message').item.json.text }}\"\n}",
+        "jsonBody": "={{ JSON.stringify({\n  lead_id: $('Upsert Lead in CRM').item.json.lead_id,\n  direction: 'in',\n  sender: 'patient',\n  channel: $('Normalize & Parse Message').item.json.channel,\n  text: $('Normalize & Parse Message').item.json.text\n}) }}",
         "options": {}
       },
       "id": "node-log-patient-msg",
       "name": "Log Patient Message in CRM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 420]
+      "position": [1040, 420]
     },
     {
       "parameters": {
@@ -115,18 +153,22 @@
       "name": "Route by Intent",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [1140, 420]
+      "position": [1260, 420]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/available-slots?treatment=trt-1",
+        "url": "https://clinic.wovextech.com/api/available-slots?treatment=trt-1",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+              "value": "crm_live_secret_key_12345"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer IsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm"
             }
           ]
         },
@@ -136,12 +178,12 @@
       "name": "Get Available Slots",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1400, 180]
+      "position": [1520, 180]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/create-appointment",
+        "url": "https://clinic.wovextech.com/api/create-appointment",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -151,20 +193,24 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+              "value": "crm_live_secret_key_12345"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer IsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": \"{{ $('Upsert Lead in CRM').item.json.lead_id }}\",\n  \"start\": \"{{ $('Get Available Slots').item.json.slots[0].start }}\",\n  \"treatment\": \"trt-1\",\n  \"channel\": \"whatsapp\",\n  \"notes\": \"Automated WhatsApp Booking via n8n with keyword detection\"\n}",
+        "jsonBody": "={{ JSON.stringify({\n  lead_id: $('Upsert Lead in CRM').item.json.lead_id,\n  start: $('Get Available Slots').item.json.slots[0].start,\n  treatment: 'trt-1',\n  channel: 'whatsapp',\n  notes: 'Automated WhatsApp Booking via n8n with keyword detection'\n}) }}",
         "options": {}
       },
       "id": "node-book-appointment",
       "name": "Book Appointment in CRM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1640, 180]
+      "position": [1740, 180]
     },
     {
       "parameters": {
@@ -174,12 +220,12 @@
       "name": "Format Booking Reply",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1880, 180]
+      "position": [1960, 180]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/handover",
+        "url": "https://clinic.wovextech.com/api/handover",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -189,7 +235,11 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+              "value": "crm_live_secret_key_12345"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer IsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm"
             }
           ]
         },
@@ -202,7 +252,7 @@
       "name": "Trigger Emergency Handover",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1400, 320]
+      "position": [1520, 320]
     },
     {
       "parameters": {
@@ -212,12 +262,12 @@
       "name": "Format Emergency Reply",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1640, 320]
+      "position": [1740, 320]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/handover",
+        "url": "https://clinic.wovextech.com/api/handover",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -227,7 +277,11 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+              "value": "crm_live_secret_key_12345"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer IsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm"
             }
           ]
         },
@@ -240,7 +294,7 @@
       "name": "Trigger Staff Handover",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1400, 460]
+      "position": [1520, 460]
     },
     {
       "parameters": {
@@ -250,7 +304,7 @@
       "name": "Format Handover Reply",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1640, 460]
+      "position": [1740, 460]
     },
     {
       "parameters": {
@@ -260,7 +314,7 @@
       "name": "Format Pricing Reply",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1400, 600]
+      "position": [1520, 600]
     },
     {
       "parameters": {
@@ -270,7 +324,7 @@
       "name": "Format Location Info",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1400, 740]
+      "position": [1520, 740]
     },
     {
       "parameters": {
@@ -280,12 +334,12 @@
       "name": "Format Greeting Reply",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1400, 880]
+      "position": [1520, 880]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/log-message",
+        "url": "https://clinic.wovextech.com/api/log-message",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -295,28 +349,32 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+              "value": "crm_live_secret_key_12345"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer IsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": \"{{ $json.lead_id }}\",\n  \"direction\": \"out\",\n  \"sender\": \"ai\",\n  \"channel\": \"whatsapp\",\n  \"text\": \"{{ $json.reply_text }}\"\n}",
+        "jsonBody": "={{ JSON.stringify({\n  lead_id: $json.lead_id,\n  direction: 'out',\n  sender: 'ai',\n  channel: 'whatsapp',\n  text: $json.reply_text\n}) }}",
         "options": {}
       },
       "id": "node-log-outbound-crm",
       "name": "Log Outbound Reply in CRM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2140, 480]
+      "position": [2220, 480]
     },
     {
       "parameters": {
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "={{ $env.GOOGLE_SHEET_ID || 'YOUR_GOOGLE_SHEET_ID_HERE' }}",
-          "mode": "id"
+          "value": "",
+          "mode": "list"
         },
         "sheetName": {
           "__rl": true,
@@ -342,7 +400,7 @@
       "name": "Append to Google Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [2380, 480],
+      "position": [2460, 480],
       "continueOnFail": true
     },
     {
@@ -360,14 +418,14 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"apiKey\": \"{{ $env.AISENSY_API_KEY || 'YOUR_AISENSY_API_KEY' }}\",\n  \"campaignName\": \"clinic_patient_reply\",\n  \"destination\": \"{{ $('Normalize & Parse Message').item.json.phone.replace('+', '') }}\",\n  \"userName\": \"{{ $('Normalize & Parse Message').item.json.name }}\",\n  \"message\": \"{{ $('Format Booking Reply').item.json.reply_text || $('Format Emergency Reply').item.json.reply_text || $('Format Handover Reply').item.json.reply_text || $('Format Pricing Reply').item.json.reply_text || $('Format Location Info').item.json.reply_text || $('Format Greeting Reply').item.json.reply_text }}\"\n}",
+        "jsonBody": "={{ JSON.stringify({\n  apiKey: $('Workflow Settings (Edit Keys Here)').item.json.AISENSY_API_KEY,\n  campaignName: 'clinic_patient_reply',\n  destination: $('Normalize & Parse Message').item.json.phone.replace('+', ''),\n  userName: $('Normalize & Parse Message').item.json.name,\n  message: $('Format Booking Reply').item.json.reply_text || $('Format Emergency Reply').item.json.reply_text || $('Format Handover Reply').item.json.reply_text || $('Format Pricing Reply').item.json.reply_text || $('Format Location Info').item.json.reply_text || $('Format Greeting Reply').item.json.reply_text\n}) }}",
         "options": {}
       },
       "id": "node-aisensy-send",
       "name": "Send WhatsApp via AiSensy",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2620, 480],
+      "position": [2700, 480],
       "continueOnFail": true
     },
     {
@@ -378,11 +436,22 @@
       "name": "Return Final Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2860, 480]
+      "position": [2940, 480]
     }
   ],
   "connections": {
     "Incoming Patient Webhook": {
+      "main": [
+        [
+          {
+            "node": "Workflow Settings (Edit Keys Here)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Settings (Edit Keys Here)": {
       "main": [
         [
           {

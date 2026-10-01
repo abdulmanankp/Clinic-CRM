@@ -15,6 +15,8 @@ import {
   handleGetDueFollowups,
   handleFollowupSent,
   handleDailyDigest,
+  handleMetaWebhookVerification,
+  handleMetaWebhookMessage,
 } from './server/api.ts';
 import {
   handleWebChatProxy,
@@ -122,6 +124,10 @@ app.get(['/daily-digest', '/api/daily-digest'], (req, res, next) => {
 // Web Chat Proxy (called by /widget, rate limited by IP)
 app.post(['/web-chat-proxy', '/api/web-chat-proxy'], handleWebChatProxy);
 
+// Meta WhatsApp Cloud Webhook (Verification & Ingestion)
+app.get(['/meta-webhook', '/api/meta-webhook'], handleMetaWebhookVerification);
+app.post(['/meta-webhook', '/api/meta-webhook'], handleMetaWebhookMessage);
+
 // Staff message sending (from CRM Inbox, checks 24h WhatsApp window)
 app.post('/api/staff-send-message', handleStaffSendMessage);
 
@@ -146,7 +152,48 @@ app.get('/api/staff/bundle', (_req, res) => {
     appointments: db.appointments,
     followups: db.followups,
     activities: db.activities,
+    staff_users: db.getStaffUsers(),
   });
+});
+
+// Database-backed Staff Authentication
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ ok: false, error: 'Email and password credentials are required.' });
+  }
+  const result = db.authenticateUser(email, password);
+  if (!result.ok) {
+    return res.status(401).json(result);
+  }
+  return res.json(result);
+});
+
+// Staff Users Database Management Endpoints
+app.get('/api/staff-users', (_req, res) => {
+  return res.json({ ok: true, staff_users: db.getStaffUsers() });
+});
+
+app.post('/api/staff-users', (req, res) => {
+  const { name, email, role, password } = req.body;
+  if (!name || !email || !role) {
+    return res.status(400).json({ ok: false, error: 'Name, email, and role are required' });
+  }
+  const newUser = db.createStaffUser({ name, email, role, password });
+  return res.json({ ok: true, user: newUser });
+});
+
+app.put('/api/staff-users/:id/role', (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+  const ok = db.updateStaffUserRole(id, role);
+  return res.json({ ok });
+});
+
+app.delete('/api/staff-users/:id', (req, res) => {
+  const { id } = req.params;
+  const ok = db.deleteStaffUser(id);
+  return res.json({ ok });
 });
 
 // Update treatment / KB / settings from frontend

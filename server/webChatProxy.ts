@@ -328,6 +328,32 @@ export async function handleStaffSendMessage(req: Request, res: Response) {
     } catch {
       // Expected in standalone mode
     }
+
+    // Direct WhatsApp Cloud API dispatch if Meta credentials are present
+    const metaToken = process.env.META_ACCESS_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN;
+    const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.META_PHONE_NUMBER_ID;
+    if (conv.channel === 'whatsapp' && metaToken && phoneId) {
+      try {
+        const cleanPhone = lead.phone.replace(/\D/g, '');
+        await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${metaToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: cleanPhone,
+            type: 'text',
+            text: { preview_url: false, body: text },
+          }),
+          signal: AbortSignal.timeout(4000),
+        });
+      } catch (e) {
+        console.error('Failed to dispatch staff reply to WhatsApp Cloud API:', e);
+      }
+    }
   })();
 
   db.logActivity('message_received', `Staff replied to ${lead.name}`, `"${text.substring(0, 45)}..."`, lead.id);

@@ -270,7 +270,7 @@ export function handleLogMessage(req: Request, res: Response) {
   // Periodic triggers check
   db.checkNoBookingFollowups();
 
-  return res.json({ ok: true, duplicate: false });
+  return res.json({ ok: true, duplicate: false, lead_id, reply_text: text });
 }
 
 /**
@@ -583,4 +583,171 @@ export function handleDailyDigest(req: Request, res: Response) {
     no_shows,
     avg_first_response_seconds,
   });
+}
+
+/**
+ * GET /api/meta-webhook or /meta-webhook
+ * Handles Meta WhatsApp Cloud Webhook Verification (Challenge)
+ */
+export function handleMetaWebhookVerification(req: Request, res: Response) {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  const expectedToken =
+    process.env.META_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN || 'clinic_meta_token_123';
+
+  if (mode === 'subscribe' && token === expectedToken) {
+    console.log('[Meta Webhook Verified] Successfully subscribed to WhatsApp Cloud API');
+    return res.status(200).send(challenge);
+  }
+
+  return res.status(403).json({ error: 'Verification token mismatch' });
+}
+
+/**
+ * POST /api/meta-webhook or /meta-webhook
+ * Ingests incoming WhatsApp Cloud messages directly from Meta into CRM
+ */
+export async function handleMetaWebhookMessage(req: Request, res: Response) {
+  try {
+    const entry = req.body?.entry?.[0];
+    const changes = entry?.changes?.[0]?.value;
+    const message = changes?.messages?.[0];
+    const contact = changes?.contacts?.[0];
+
+    // Meta sends delivery receipts and status updates that don't contain message text
+    if (!message) {
+      return res.status(200).json({ ok: true, note: 'Status update acknowledged' });
+    }
+
+    const rawFrom = message.from || '';
+    const phone = rawFrom.startsWith('+') ? rawFrom : `+${rawFrom}`;
+    const name = contact?.profile?.name || 'WhatsApp Patient';
+
+    // Extract text from text message or interactive buttons / list selection
+    let text = '';
+    if (message.type === 'text') {
+      text = message.text?.body || '';
+    } else if (message.type === 'interactive') {
+      text =
+        message.interactive?.button_reply?.title ||
+        message.interactive?.list_reply?.title ||
+        message.interactive?.button_reply?.id ||
+        '';
+    } else if (message.type === 'button') {
+      text = message.button?.text || '';
+    }
+
+    if (!text) {
+      return res.status(200).json({ ok: true, note: 'Non-text message acknowledged' });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    // 1. Upsert Lead in CRM
+    let lead = db.leads.find((l) => l.phone === phone);
+    if (!lead) {
+      const newLead: Lead = {
+        id: 'lead-' + Math.random().toString(36).substring(2, 9),
+        phone,
+        name,
+        channel_first: 'whatsapp',
+        status: 'new',
+        created_at: nowIso,
+        language: /[\u0600-\u06FF]/.test(text) ? 'ar' : 'en',
+        treatment_interest: 'General Consultation',
+        source: 'WhatsApp Cloud Direct',
+        after_hours: db.isAfterHours(nowIso),
+        opted_out: false,
+      };
+      db.leads.push(newLead);
+      lead = newLead;
+      db.logActivity('lead_new', `New WhatsApp Lead: ${name}`, `Phone: ${phone}`, lead.id);
+    }
+
+    // 2. Find or create conversation
+    let conv = db.conversations.find((c) => c.lead_id === lead.id && c.channel === 'whatsapp');
+    if (!conv) {
+      conv = {
+        id: 'conv-' + Math.random().toString(36).substring(2, 9),
+        lead_id: lead.id,
+        channel: 'whatsapp',
+        mode: 'ai',
+        unread_count: 1,
+        last_message_at: nowIso,
+        last_patient_message_at: nowIso,
+      };
+      db.conversations.push(conv);
+    } else {
+      conv.unread_count += 1;
+      conv.last_message_at = nowIso;
+      conv.last_patient_message_at = nowIso;
+    }
+
+    // 3. Log inbound patient message in CRM
+    const msgId = 'msg-' + Math.random().toString(36).substring(2, 9);
+    db.messages.push({
+      id: msgId,
+      conversation_id: conv.id,
+      sender: 'patient',
+      direction: 'in',
+      text,
+      created_at: nowIso,
+    });
+
+    // 4. Clinical Emergency / Human Handover Detection
+    const lower = text.toLowerCase();
+    const isEmergency = [
+      'bleeding',
+      'severe pain',
+      'swelling',
+      'accident',
+      'emergency',
+      'acute trauma',
+      'cannot breathe',
+      'نزيف',
+      'طوارئ',
+      'ألم شديد',
+    ].some((kw) => lower.includes(kw));
+
+    const isHandover = [
+      'human',
+      'agent',
+      'doctor',
+      'operator',
+      'receptionist',
+      'speak to someone',
+      'talk to person',
+      'call me',
+      'موظف',
+      'طبيب',
+      'انسان',
+    ].some((kw) => lower.includes(kw));
+
+    if (isEmergency || isHandover) {
+      conv.mode = 'human';
+      conv.handover_reason = isEmergency
+        ? 'CRITICAL: Emergency Medical Keyword Detected in WhatsApp message'
+        : 'Patient requested live receptionist / doctor';
+      lead.status = 'engaged';
+      db.logActivity('handover', `Staff Handover Triggered for ${lead.name}`, conv.handover_reason, lead.id);
+    }
+
+    // 5. Forward to n8n webhook if configured
+    const n8nBase = process.env.N8N_BASE_URL;
+    if (n8nBase) {
+      fetch(`${n8nBase.replace(/\/$/, '')}/webhook/clinic-inbound`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, name, message: text, channel: 'whatsapp' }),
+        signal: AbortSignal.timeout(3000),
+      }).catch(() => {});
+    }
+
+    return res.status(200).json({ ok: true, lead_id: lead.id, message_id: msgId, mode: conv.mode });
+  } catch (err: any) {
+    console.error('Meta webhook error:', err);
+    return res.status(200).json({ ok: true, note: 'Error handled gracefully' });
+  }
 }
