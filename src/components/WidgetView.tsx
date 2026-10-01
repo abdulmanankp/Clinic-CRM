@@ -146,7 +146,7 @@ export const WidgetView: React.FC = () => {
   return (
     <div
       dir={isRtl ? 'rtl' : 'ltr'}
-      className="max-w-md mx-auto h-[620px] bg-white rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden text-slate-800"
+      className="w-full max-w-md mx-auto h-[90vh] max-h-[660px] min-h-[480px] bg-white rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden text-slate-800"
     >
       {/* Widget Header */}
       <div className="bg-gradient-to-r from-teal-800 to-teal-600 p-4 text-white flex items-center justify-between">

@@ -21,7 +21,7 @@ const MainAppContent: React.FC = () => {
   // Direct standalone widget route
   if (typeof window !== 'undefined' && window.location.pathname === '/widget') {
     return (
-      <div className="min-h-screen bg-[#f6f8fc] flex items-center justify-center p-4">
+      <div className="h-screen w-full bg-[#f6f8fc] flex items-center justify-center p-2 sm:p-4 overflow-hidden">
         <WidgetView />
       </div>
     );
@@ -81,48 +81,53 @@ const MainAppContent: React.FC = () => {
       <Sidebar />
 
       {/* Main Viewport Workspace - Full Screen Height with Clean Scroll */}
-      <main className="flex-1 h-full overflow-y-auto bg-[#f6f8fc] p-4 sm:p-6 lg:p-8 flex flex-col">
+      <main className="flex-1 h-full min-h-0 bg-[#f6f8fc] p-3 sm:p-5 lg:p-6 flex flex-col overflow-hidden">
         {/* Top Bar with Page Title and Global Actions */}
         <TopBar onOpenBookingModal={() => setBookingModalLeadId('new')} />
 
-        {/* Dynamic Tab Body */}
-        <div className="flex-1 pb-8">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'inbox' && <Inbox />}
-          {activeTab === 'leads' && (
-            <LeadsView onOpenBookingModal={(leadId) => setBookingModalLeadId(leadId)} />
-          )}
-          {activeTab === 'appointments' && <AppointmentsView />}
-          {activeTab === 'followups' && <FollowupsView />}
-          {activeTab === 'settings' && <SettingsView />}
-          {activeTab === 'users' && <UsersManagementView />}
+        {/* Dynamic Tab Body: Inbox is full-height fit-to-screen, other views have dedicated smooth scroll */}
+        {activeTab === 'inbox' ? (
+          <div className="flex-1 min-h-0 h-full flex flex-col overflow-hidden">
+            <Inbox />
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto pb-8 pr-1">
+            {activeTab === 'dashboard' && <Dashboard />}
+            {activeTab === 'leads' && (
+              <LeadsView onOpenBookingModal={(leadId) => setBookingModalLeadId(leadId)} />
+            )}
+            {activeTab === 'appointments' && <AppointmentsView />}
+            {activeTab === 'followups' && <FollowupsView />}
+            {activeTab === 'settings' && <SettingsView />}
+            {activeTab === 'users' && <UsersManagementView />}
 
-          {/* Widget Preview Tab */}
-          {activeTab === 'widget-preview' && (
-            <div className="space-y-4">
-              <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-800">Website Chat Widget (/widget)</h2>
-                  <p className="text-xs text-slate-400">English & Arabic with RTL. Tested with /web-chat-proxy</p>
+            {/* Widget Preview Tab */}
+            {activeTab === 'widget-preview' && (
+              <div className="space-y-4 max-w-4xl mx-auto">
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-800">Website Chat Widget (/widget)</h2>
+                    <p className="text-xs text-slate-400">English & Arabic with RTL. Tested with /web-chat-proxy</p>
+                  </div>
+
+                  <a
+                    href="/widget"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center space-x-1.5 transition-colors shadow-xs"
+                  >
+                    <span>Open in Tab</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 </div>
 
-                <a
-                  href="/widget"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center space-x-1.5 transition-colors shadow-xs"
-                >
-                  <span>Open in Tab</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                <div className="flex justify-center p-4 sm:p-8 bg-slate-100/60 rounded-3xl border border-dashed border-slate-200">
+                  <WidgetView />
+                </div>
               </div>
-
-              <div className="flex justify-center p-8 bg-slate-100/60 rounded-3xl border border-dashed border-slate-200">
-                <WidgetView />
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Global Booking Modal */}
