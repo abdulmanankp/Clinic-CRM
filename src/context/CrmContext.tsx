@@ -27,8 +27,11 @@ interface CrmContextType {
   activities: ActivityEvent[];
   currentUser: StaffUser;
   setCurrentUser: (user: StaffUser) => void;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  logout: () => void;
   staffUsers: StaffUser[];
-  createStaffUser: (userData: { name: string; email: string; role: UserRole }) => void;
+  createStaffUser: (userData: { name: string; email: string; role: UserRole; password?: string }) => void;
   updateStaffUserRole: (id: string, role: UserRole) => void;
   deleteStaffUser: (id: string) => void;
   activeTab: 'dashboard' | 'inbox' | 'leads' | 'appointments' | 'followups' | 'settings' | 'users' | 'widget-preview';
@@ -76,6 +79,7 @@ const defaultStaffUsersList: StaffUser[] = [
     name: 'Abdul Manan',
     email: 'abdulmanankp0@gmail.com',
     role: 'super_admin',
+    password: 'Manana!@1234',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     created_at: '2026-01-01',
   },
@@ -84,6 +88,7 @@ const defaultStaffUsersList: StaffUser[] = [
     name: 'Dr. Tariq Mansoor',
     email: 'tariq.mansoor@democlinic.ae',
     role: 'admin',
+    password: 'ClinicAdmin2026!',
     avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80',
     created_at: '2026-01-01',
   },
@@ -92,6 +97,7 @@ const defaultStaffUsersList: StaffUser[] = [
     name: 'Dr. Sarah Al-Mansoori',
     email: 'sarah.mansoori@democlinic.ae',
     role: 'admin',
+    password: 'ClinicAdmin2026!',
     avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80',
     created_at: '2026-01-15',
   },
@@ -100,6 +106,7 @@ const defaultStaffUsersList: StaffUser[] = [
     name: 'Layla Al-Amiri',
     email: 'layla.amiri@democlinic.ae',
     role: 'staff',
+    password: 'StaffLayla2026!',
     avatar: 'https://images.unsplash.com/photo-1594824813572-c2e8c2a80693?w=150&auto=format&fit=crop&q=80',
     created_at: '2026-02-01',
   },
@@ -118,8 +125,41 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [followups, setFollowups] = useState<Followup[]>([]);
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
 
-  const [staffUsers, setStaffUsers] = useState<StaffUser[]>(defaultStaffUsersList);
-  const [currentUser, setCurrentUser] = useState<StaffUser>(defaultStaffUsersList[0]);
+  // Load staff users from localStorage if available, or use defaults
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>(() => {
+    try {
+      const stored = localStorage.getItem('clinicflow_staff_users');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Ensure Abdul Manan is always in the list as Super Admin
+        const hasAbdul = parsed.some((u: StaffUser) => u.email === 'abdulmanankp0@gmail.com');
+        if (!hasAbdul) {
+          return [defaultStaffUsersList[0], ...parsed];
+        }
+        return parsed;
+      }
+    } catch {}
+    return defaultStaffUsersList;
+  });
+
+  // Auth session management: check localStorage on init
+  const [currentUser, setCurrentUser] = useState<StaffUser>(() => {
+    try {
+      const stored = localStorage.getItem('clinicflow_auth_user');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {}
+    return defaultStaffUsersList[0];
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('clinicflow_is_authenticated') === 'true';
+    } catch {}
+    return false;
+  });
+
   const [activeTab, setActiveTab] = useState<CrmContextType['activeTab']>('dashboard');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -130,6 +170,37 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 4000);
   }, []);
+
+  const login = async (email: string, pass: string): Promise<{ ok: boolean; error?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const user = staffUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (!user) {
+      return { ok: false, error: 'No account found with this email address.' };
+    }
+
+    if (user.password && user.password !== pass) {
+      return { ok: false, error: 'Incorrect password. Please try again.' };
+    }
+
+    // Success
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    try {
+      localStorage.setItem('clinicflow_auth_user', JSON.stringify(user));
+      localStorage.setItem('clinicflow_is_authenticated', 'true');
+    } catch {}
+    showToast(`Welcome back, ${user.name}!`, 'success');
+    return { ok: true };
+  };
+
+  const logout = () => {
+    try {
+      localStorage.removeItem('clinicflow_is_authenticated');
+    } catch {}
+    setIsAuthenticated(false);
+    showToast('You have been logged out securely.', 'info');
+  };
 
   const refreshData = useCallback(async () => {
     try {
@@ -438,6 +509,9 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activities,
         currentUser,
         setCurrentUser,
+        isAuthenticated,
+        login,
+        logout,
         staffUsers,
         createStaffUser,
         updateStaffUserRole,

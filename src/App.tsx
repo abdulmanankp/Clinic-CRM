@@ -11,10 +11,11 @@ import { SettingsView } from './components/SettingsView.tsx';
 import { UsersManagementView } from './components/UsersManagementView.tsx';
 import { WidgetView } from './components/WidgetView.tsx';
 import { NewAppointmentModal } from './components/NewAppointmentModal.tsx';
+import { LoginScreen } from './components/LoginScreen.tsx';
 import { ExternalLink } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
-  const { activeTab, loading, toastMessage } = useCrm();
+  const { activeTab, loading, toastMessage, isAuthenticated } = useCrm();
   const [bookingModalLeadId, setBookingModalLeadId] = useState<string | null>(null);
 
   // Direct standalone widget route
@@ -34,6 +35,28 @@ const MainAppContent: React.FC = () => {
           <p className="text-xs font-semibold text-slate-600">Loading Clinic Flow Portal...</p>
         </div>
       </div>
+    );
+  }
+
+  // Authentication Gate: show LoginScreen if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <>
+        {toastMessage && (
+          <div
+            className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded-2xl text-xs font-bold text-white shadow-xl transition-all ${
+              toastMessage.type === 'error'
+                ? 'bg-rose-500'
+                : toastMessage.type === 'info'
+                ? 'bg-indigo-600'
+                : 'bg-emerald-600'
+            }`}
+          >
+            {toastMessage.text}
+          </div>
+        )}
+        <LoginScreen />
+      </>
     );
   }
 

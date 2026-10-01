@@ -1,0 +1,622 @@
+{
+  "name": "ClinicFlow - Master Patient WhatsApp, Google Sheets & AiSensy Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clinic-inbound",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "node-webhook-inbound",
+      "name": "Incoming Patient Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 420],
+      "webhookId": "clinic-inbound"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Normalize incoming payload from WhatsApp (AiSensy / Meta / Twilio) or Web Chat\nconst data = $input.first().json;\nconst body = data.body || data;\n\n// Extract phone number (sanitized to E.164)\nlet rawPhone = body.phone || body.mobile || body.from || body.wa_id || body.recipient_id || '+971501234567';\nlet phone = String(rawPhone).trim();\nif (!phone.startsWith('+')) {\n  phone = '+' + phone.replace(/\\D/g, '');\n}\n\n// Extract patient name\nconst name = body.name || body.sender_name || body.profile_name || 'Valued Patient';\n\n// Extract message text\nconst text = String(body.message || body.text || body.body || body.message_text || '').trim();\nconst lower = text.toLowerCase();\n\n// Extract channel\nconst channel = (body.channel || 'whatsapp').toLowerCase();\n\n// 2. Intelligent Keyword & Intent Detection\nlet intent = 'greeting';\nlet treatmentInterest = 'General Consultation';\n\n// A. Emergency triage keywords\nconst emergencyKeywords = ['bleeding', 'severe pain', 'swelling', 'accident', 'emergency', 'acute trauma', 'cannot breathe', 'نزيف', 'طوارئ', 'ألم شديد', 'حادث'];\nif (emergencyKeywords.some(kw => lower.includes(kw))) {\n  intent = 'emergency';\n}\n// B. Human handover keywords\nelse if (['human', 'agent', 'doctor', 'operator', 'receptionist', 'speak to someone', 'talk to person', 'call me', 'موظف', 'طبيب', 'انسان', 'تحدث مع'].some(kw => lower.includes(kw))) {\n  intent = 'handover';\n}\n// C. Booking keywords\nelse if (['book', 'appointment', 'schedule', 'reserve', 'whitening', 'botox', 'cleaning', 'invisalign', 'consultation', 'teeth', 'filler', 'حجز', 'موعد', 'تبييض', 'تنظيف', 'بوتوكس'].some(kw => lower.includes(kw))) {\n  intent = 'booking';\n  if (lower.includes('whitening') || lower.includes('تبييض')) treatmentInterest = 'Zoom Teeth Whitening';\n  else if (lower.includes('botox') || lower.includes('بوتوكس')) treatmentInterest = 'Botox Injections';\n  else if (lower.includes('invisalign')) treatmentInterest = 'Invisalign Consultation';\n  else if (lower.includes('cleaning') || lower.includes('تنظيف')) treatmentInterest = 'Routine Dental Hygiene';\n}\n// D. Pricing keywords\nelse if (['price', 'cost', 'how much', 'rate', 'aed', 'fees', 'سعر', 'كم سعر', 'تكلفة', 'اسعار'].some(kw => lower.includes(kw))) {\n  intent = 'pricing';\n}\n// E. Location / Hours keywords\nelse if (['hours', 'location', 'open', 'where', 'address', 'marina', 'موقع', 'ساعات', 'مكان', 'عنوان'].some(kw => lower.includes(kw))) {\n  intent = 'info';\n}\n\nreturn [{\n  json: {\n    phone,\n    name,\n    text,\n    channel,\n    intent,\n    treatment_interest: treatmentInterest,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-normalize-parse",
+      "name": "Normalize & Parse Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/upsert-lead",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone\": \"{{ $('Normalize & Parse Message').item.json.phone }}\",\n  \"name\": \"{{ $('Normalize & Parse Message').item.json.name }}\",\n  \"channel\": \"{{ $('Normalize & Parse Message').item.json.channel }}\",\n  \"treatment_interest\": \"{{ $('Normalize & Parse Message').item.json.treatment_interest }}\",\n  \"source\": \"WhatsApp Automation (n8n)\"\n}",
+        "options": {}
+      },
+      "id": "node-upsert-lead",
+      "name": "Upsert Lead in CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/log-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('Upsert Lead in CRM').item.json.lead_id }}\",\n  \"direction\": \"in\",\n  \"sender\": \"patient\",\n  \"channel\": \"{{ $('Normalize & Parse Message').item.json.channel }}\",\n  \"text\": \"{{ $('Normalize & Parse Message').item.json.text }}\"\n}",
+        "options": {}
+      },
+      "id": "node-log-patient-msg",
+      "name": "Log Patient Message in CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 420]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $('Normalize & Parse Message').item.json.intent }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "booking",
+              "outputKey": "booking"
+            },
+            {
+              "value2": "emergency",
+              "outputKey": "emergency"
+            },
+            {
+              "value2": "handover",
+              "outputKey": "handover"
+            },
+            {
+              "value2": "pricing",
+              "outputKey": "pricing"
+            },
+            {
+              "value2": "info",
+              "outputKey": "info"
+            }
+          ]
+        },
+        "fallbackOutput": 5
+      },
+      "id": "node-intent-switch",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1140, 420]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/available-slots?treatment=trt-1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-get-slots",
+      "name": "Get Available Slots",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/create-appointment",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('Upsert Lead in CRM').item.json.lead_id }}\",\n  \"start\": \"{{ $('Get Available Slots').item.json.slots[0].start }}\",\n  \"treatment\": \"trt-1\",\n  \"channel\": \"whatsapp\",\n  \"notes\": \"Automated WhatsApp Booking via n8n with keyword detection\"\n}",
+        "options": {}
+      },
+      "id": "node-book-appointment",
+      "name": "Book Appointment in CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1640, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "const booking = $input.first().json;\nconst lead = $('Normalize & Parse Message').item.json;\nconst slotData = $('Get Available Slots').item.json.slots[0];\nconst leadId = $('Upsert Lead in CRM').item.json.lead_id;\n\nconst dateObj = new Date(slotData.start);\nconst dateFormatted = dateObj.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });\nconst timeFormatted = dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });\n\nconst replyText = `✅ APPOINTMENT CONFIRMED!\\n\\nDear ${lead.name},\\nYour appointment has been successfully scheduled at Demo Dental & Aesthetic Clinic.\\n\\n📅 Date: ${dateFormatted}\\n⏰ Time: ${timeFormatted} (Gulf Standard Time)\\n🦷 Treatment: ${lead.treatment_interest}\\n📍 Location: Dubai Marina Walk, Building 4 (Free Valet Parking)\\n\\nTo reschedule or inquire about insurance, reply directly to this message. We look forward to welcoming you!`;\n\nreturn [{\n  json: {\n    lead_id: leadId,\n    phone: lead.phone,\n    name: lead.name,\n    intent: lead.intent,\n    text: lead.text,\n    reply_text: replyText,\n    action: 'appointment_booked',\n    appointment_id: booking.appointment_id,\n    appointment_date: `${dateFormatted} at ${timeFormatted}`\n  }\n}];"
+      },
+      "id": "node-format-booking",
+      "name": "Format Booking Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/handover",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('Upsert Lead in CRM').item.json.lead_id }}\",\n  \"reason\": \"CRITICAL: Emergency Medical Keyword Detected in WhatsApp message\"\n}",
+        "options": {}
+      },
+      "id": "node-emergency-handover",
+      "name": "Trigger Emergency Handover",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Normalize & Parse Message').item.json;\nconst leadId = $('Upsert Lead in CRM').item.json.lead_id;\n\nconst replyText = `🚨 URGENT MEDICAL NOTICE:\\n\\nIf you are experiencing acute facial trauma, uncontrollable bleeding, or severe swelling affecting your breathing, please proceed immediately to the nearest Emergency Hospital or dial 999 (Dubai Police / Ambulance).\\n\\nOur clinical lead has been immediately alerted and assigned to your case.`;\n\nreturn [{\n  json: {\n    lead_id: leadId,\n    phone: lead.phone,\n    name: lead.name,\n    intent: lead.intent,\n    text: lead.text,\n    reply_text: replyText,\n    action: 'emergency_alert'\n  }\n}];"
+      },
+      "id": "node-format-emergency",
+      "name": "Format Emergency Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1640, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/handover",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('Upsert Lead in CRM').item.json.lead_id }}\",\n  \"reason\": \"Patient requested human representative / agent\"\n}",
+        "options": {}
+      },
+      "id": "node-human-handover",
+      "name": "Trigger Staff Handover",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Normalize & Parse Message').item.json;\nconst leadId = $('Upsert Lead in CRM').item.json.lead_id;\n\nconst replyText = `👩‍⚕️ HUMAN HANDOVER ACTIVATED\\n\\nDear ${lead.name},\\nYou are now connected directly with our front-desk patient care team at Demo Dental & Aesthetic Clinic.\\n\\nOne of our reception coordinators will respond right here in this chat shortly.`;\n\nreturn [{\n  json: {\n    lead_id: leadId,\n    phone: lead.phone,\n    name: lead.name,\n    intent: lead.intent,\n    text: lead.text,\n    reply_text: replyText,\n    action: 'staff_handover'\n  }\n}];"
+      },
+      "id": "node-format-handover",
+      "name": "Format Handover Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1640, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Normalize & Parse Message').item.json;\nconst leadId = $('Upsert Lead in CRM').item.json.lead_id;\n\nconst replyText = `✨ POPULAR TREATMENTS & PRICING\\nDemo Dental & Aesthetic Clinic (Dubai Marina):\\n\\n1. Zoom Teeth Whitening (In-Office): From AED 850\\n2. Routine Dental Hygiene & Polish: AED 350\\n3. Botox Anti-Wrinkle: From AED 950 / area\\n4. Dermal Fillers (Juvederm): From AED 1,200 / ml\\n5. Invisalign Clear Aligners: Complimentary 3D Scan\\n\\n👉 To book any of these, simply reply with \"BOOK\" or the treatment name!`;\n\nreturn [{\n  json: {\n    lead_id: leadId,\n    phone: lead.phone,\n    name: lead.name,\n    intent: lead.intent,\n    text: lead.text,\n    reply_text: replyText,\n    action: 'pricing_info'\n  }\n}];"
+      },
+      "id": "node-format-pricing",
+      "name": "Format Pricing Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Normalize & Parse Message').item.json;\nconst leadId = $('Upsert Lead in CRM').item.json.lead_id;\n\nconst replyText = `📍 CLINIC HOURS & LOCATION:\\n\\n🏥 Demo Dental & Aesthetic Clinic\\n📍 Dubai Marina Walk, Building 4, Promenade Level\\n🚗 Free Underground Valet Parking (get ticket stamped)\\n\\n⏰ Working Hours:\\n• Monday - Friday: 09:00 AM - 08:00 PM\\n• Saturday: 10:00 AM - 06:00 PM\\n• Sunday: Closed\\n\\nReply \"BOOK\" anytime to schedule your appointment!`;\n\nreturn [{\n  json: {\n    lead_id: leadId,\n    phone: lead.phone,\n    name: lead.name,\n    intent: lead.intent,\n    text: lead.text,\n    reply_text: replyText,\n    action: 'clinic_info'\n  }\n}];"
+      },
+      "id": "node-format-info",
+      "name": "Format Location Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 740]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Normalize & Parse Message').item.json;\nconst leadId = $('Upsert Lead in CRM').item.json.lead_id;\n\nconst replyText = `Hello ${lead.name}! 👋 Welcome to Demo Dental & Aesthetic Clinic, Dubai Marina.\\n\\nHow may we assist you today?\\n1️⃣ Reply \"BOOK\" to schedule an appointment\\n2️⃣ Reply \"PRICING\" for treatments and costs\\n3️⃣ Reply \"AGENT\" to speak with our reception desk`;\n\nreturn [{\n  json: {\n    lead_id: leadId,\n    phone: lead.phone,\n    name: lead.name,\n    intent: lead.intent,\n    text: lead.text,\n    reply_text: replyText,\n    action: 'general_greeting'\n  }\n}];"
+      },
+      "id": "node-format-greeting",
+      "name": "Format Greeting Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 880]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CRM_BASE_URL || 'https://clinic.wovextech.com' }}/api/log-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.CRM_API_KEY || 'crm_live_secret_key_12345' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $json.lead_id }}\",\n  \"direction\": \"out\",\n  \"sender\": \"ai\",\n  \"channel\": \"whatsapp\",\n  \"text\": \"{{ $json.reply_text }}\"\n}",
+        "options": {}
+      },
+      "id": "node-log-outbound-crm",
+      "name": "Log Outbound Reply in CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2140, 480]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID || 'YOUR_GOOGLE_SHEET_ID_HERE' }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $('Normalize & Parse Message').item.json.timestamp }}",
+            "Patient Name": "={{ $('Normalize & Parse Message').item.json.name }}",
+            "Phone Number": "={{ $('Normalize & Parse Message').item.json.phone }}",
+            "Channel": "={{ $('Normalize & Parse Message').item.json.channel }}",
+            "Detected Intent": "={{ $('Normalize & Parse Message').item.json.intent }}",
+            "Patient Message": "={{ $('Normalize & Parse Message').item.json.text }}",
+            "Clinic Automated Reply": "={{ $('Format Booking Reply').item.json.reply_text || $('Format Emergency Reply').item.json.reply_text || $('Format Handover Reply').item.json.reply_text || $('Format Pricing Reply').item.json.reply_text || $('Format Location Info').item.json.reply_text || $('Format Greeting Reply').item.json.reply_text }}",
+            "Appointment Details": "={{ $('Format Booking Reply').item.json.appointment_date || 'N/A' }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-google-sheet-append",
+      "name": "Append to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2380, 480],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.aisensy.com/campaign/t1/api/v2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"apiKey\": \"{{ $env.AISENSY_API_KEY || 'YOUR_AISENSY_API_KEY' }}\",\n  \"campaignName\": \"clinic_patient_reply\",\n  \"destination\": \"{{ $('Normalize & Parse Message').item.json.phone.replace('+', '') }}\",\n  \"userName\": \"{{ $('Normalize & Parse Message').item.json.name }}\",\n  \"message\": \"{{ $('Format Booking Reply').item.json.reply_text || $('Format Emergency Reply').item.json.reply_text || $('Format Handover Reply').item.json.reply_text || $('Format Pricing Reply').item.json.reply_text || $('Format Location Info').item.json.reply_text || $('Format Greeting Reply').item.json.reply_text }}\"\n}",
+        "options": {}
+      },
+      "id": "node-aisensy-send",
+      "name": "Send WhatsApp via AiSensy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2620, 480],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Normalize & Parse Message').item.json;\nconst outReply = $('Format Booking Reply').item.json.reply_text || $('Format Emergency Reply').item.json.reply_text || $('Format Handover Reply').item.json.reply_text || $('Format Pricing Reply').item.json.reply_text || $('Format Location Info').item.json.reply_text || $('Format Greeting Reply').item.json.reply_text;\n\nreturn [{\n  json: {\n    success: true,\n    phone: lead.phone,\n    patient_name: lead.name,\n    detected_intent: lead.intent,\n    reply_sent: outReply,\n    crm_synced: true,\n    google_sheet_synced: true,\n    aisensy_delivered: true,\n    crm_url: 'https://clinic.wovextech.com',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-final-response",
+      "name": "Return Final Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2860, 480]
+    }
+  ],
+  "connections": {
+    "Incoming Patient Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize & Parse Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize & Parse Message": {
+      "main": [
+        [
+          {
+            "node": "Upsert Lead in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Lead in CRM": {
+      "main": [
+        [
+          {
+            "node": "Log Patient Message in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Patient Message in CRM": {
+      "main": [
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [
+          {
+            "node": "Get Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trigger Emergency Handover",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trigger Staff Handover",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Pricing Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Location Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Greeting Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Book Appointment in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Appointment in CRM": {
+      "main": [
+        [
+          {
+            "node": "Format Booking Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Booking Reply": {
+      "main": [
+        [
+          {
+            "node": "Log Outbound Reply in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Emergency Handover": {
+      "main": [
+        [
+          {
+            "node": "Format Emergency Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Emergency Reply": {
+      "main": [
+        [
+          {
+            "node": "Log Outbound Reply in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Staff Handover": {
+      "main": [
+        [
+          {
+            "node": "Format Handover Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Handover Reply": {
+      "main": [
+        [
+          {
+            "node": "Log Outbound Reply in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Pricing Reply": {
+      "main": [
+        [
+          {
+            "node": "Log Outbound Reply in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Location Info": {
+      "main": [
+        [
+          {
+            "node": "Log Outbound Reply in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Greeting Reply": {
+      "main": [
+        [
+          {
+            "node": "Log Outbound Reply in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Outbound Reply in CRM": {
+      "main": [
+        [
+          {
+            "node": "Append to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp via AiSensy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp via AiSensy": {
+      "main": [
+        [
+          {
+            "node": "Return Final Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -135,6 +135,7 @@ export interface StaffUser {
   role: UserRole;
   avatar?: string;
   created_at?: string;
+  password?: string;
 }
 
 export interface ActivityEvent {

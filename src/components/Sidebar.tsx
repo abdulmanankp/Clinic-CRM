@@ -15,6 +15,7 @@ import {
   RefreshCw,
   CheckCircle2,
   Lock,
+  LogOut,
 } from 'lucide-react';
 import { UserRole } from '../types/crm.ts';
 
@@ -28,6 +29,7 @@ export const Sidebar: React.FC = () => {
     followups,
     currentUser,
     setCurrentUser,
+    logout,
     staffUsers,
     simulateEnquiry,
     resetDemoData,
@@ -37,6 +39,10 @@ export const Sidebar: React.FC = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showSimMenu, setShowSimMenu] = useState(false);
   const [simulating, setSimulating] = useState(false);
+
+  if (!currentUser) {
+    return null;
+  }
 
   const unreadCount = conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
   const pendingFollowups = followups.filter((f) => f.status === 'pending').length;
@@ -183,6 +189,19 @@ export const Sidebar: React.FC = () => {
                   {currentUser.id === u.id && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />}
                 </button>
               ))}
+
+              <div className="pt-1 mt-1 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    setShowUserDropdown(false);
+                    logout();
+                  }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-xl text-xs text-rose-600 hover:bg-rose-50 transition-colors font-semibold"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -284,6 +303,15 @@ export const Sidebar: React.FC = () => {
         >
           <RefreshCw className="w-3 h-3" />
           <span>Reset Demo Data</span>
+        </button>
+
+        {/* Secure Log Out Button */}
+        <button
+          onClick={logout}
+          className="w-full py-2 px-3 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50/60 font-semibold text-xs flex items-center justify-center space-x-1.5 transition-colors"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span>Log Out</span>
         </button>
 
         <p className="text-center text-[10px] text-slate-300 font-mono">
