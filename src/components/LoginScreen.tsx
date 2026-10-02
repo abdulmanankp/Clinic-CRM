@@ -15,8 +15,8 @@ import {
 export const LoginScreen: React.FC = () => {
   const { login } = useCrm();
 
-  const [email, setEmail] = useState('abdulmanankp0@gmail.com');
-  const [password, setPassword] = useState('Manana!@1234');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +91,7 @@ export const LoginScreen: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="abdulmanankp0@gmail.com"
+                  placeholder="Enter your email address"
                   required
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
@@ -116,7 +116,7 @@ export const LoginScreen: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
+                  placeholder="Enter your secure password"
                   required
                   className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
@@ -134,48 +134,26 @@ export const LoginScreen: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm transition-all shadow-md shadow-indigo-200 flex items-center justify-center space-x-2 mt-2"
+              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm transition-all shadow-md shadow-indigo-200 flex items-center justify-center space-x-2 mt-2 cursor-pointer"
             >
               <span>{loading ? 'Authenticating...' : 'Sign In to Portal'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          {/* Quick Credential Profiles */}
+          {/* Demo Accounts (Super Admin is strictly manual & private) */}
           <div className="mt-6 pt-5 border-t border-slate-100">
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center justify-between">
-              <span>Quick Select Account</span>
-              <span className="text-[10px] text-indigo-600 lowercase font-medium">click to load</span>
+              <span>Demo Staff Accounts</span>
+              <span className="text-[10px] text-slate-400 font-normal">Super Admin credentials private</span>
             </p>
 
             <div className="space-y-1.5">
-              {/* Super Admin: Abdul Manan */}
-              <button
-                type="button"
-                onClick={() => handleQuickFill('abdulmanankp0@gmail.com', 'Manana!@1234')}
-                className="w-full p-2 rounded-xl bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-100 text-left transition-colors flex items-center justify-between group"
-              >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
-                    SA
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-indigo-950 group-hover:text-indigo-600">
-                      Abdul Manan <span className="text-[10px] font-semibold text-indigo-600">(Super Admin)</span>
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-mono">abdulmanankp0@gmail.com</p>
-                  </div>
-                </div>
-                <span className="text-[10px] text-indigo-700 font-bold bg-white px-2 py-0.5 rounded-md border border-indigo-200">
-                  Select
-                </span>
-              </button>
-
               {/* Admin: Dr. Tariq */}
               <button
                 type="button"
                 onClick={() => handleQuickFill('tariq.mansoor@democlinic.ae', 'ClinicAdmin2026!')}
-                className="w-full p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/70 text-left transition-colors flex items-center justify-between group"
+                className="w-full p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/70 text-left transition-colors flex items-center justify-between group cursor-pointer"
               >
                 <div className="flex items-center space-x-2.5">
                   <div className="w-7 h-7 rounded-lg bg-slate-700 text-white flex items-center justify-center text-xs font-bold">
@@ -197,7 +175,7 @@ export const LoginScreen: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleQuickFill('layla.amiri@democlinic.ae', 'StaffLayla2026!')}
-                className="w-full p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/70 text-left transition-colors flex items-center justify-between group"
+                className="w-full p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/70 text-left transition-colors flex items-center justify-between group cursor-pointer"
               >
                 <div className="flex items-center space-x-2.5">
                   <div className="w-7 h-7 rounded-lg bg-slate-500 text-white flex items-center justify-center text-xs font-bold">
