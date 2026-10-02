@@ -51,7 +51,7 @@ export const Inbox: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [templateCategory, setTemplateCategory] = useState<'all' | 'booking' | 'pricing' | 'info' | 'care'>('all');
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Active conversation & lead
   const activeConv = conversations.find((c) => c.id === selectedConversationId) || conversations[0];
@@ -64,9 +64,11 @@ export const Inbox: React.FC = () => {
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     : [];
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom safely within container (never scroll outer window/topbar)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   }, [convMessages.length, selectedConversationId]);
 
   // Reset error when switching conversation
@@ -554,7 +556,7 @@ export const Inbox: React.FC = () => {
             )}
 
             {/* Messages Stream */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-3">
+            <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-3">
               {convMessages.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 text-xs">
                   No messages recorded in this conversation yet. Send a greeting or template below.
@@ -617,7 +619,6 @@ export const Inbox: React.FC = () => {
                   );
                 })
               )}
-              <div ref={messagesEndRef} />
             </div>
 
             {/* Quick Templates Bar (For both WhatsApp & Website Live Chat) */}

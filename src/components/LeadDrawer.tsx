@@ -158,6 +158,24 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({ onOpenBookingModal }) =>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
+                <span className="text-slate-400 block text-[11px]">Emirates / National ID</span>
+                <span className="font-semibold text-slate-800 font-mono">
+                  {lead.national_id || 'Not registered'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">Email Address</span>
+                <span className="font-semibold text-slate-800 truncate block">
+                  {lead.email || 'No email on file'}
+                </span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-slate-400 block text-[11px]">Residential Address / Area</span>
+                <span className="font-semibold text-slate-800 block">
+                  {lead.address || 'Dubai Marina, UAE (Default)'}
+                </span>
+              </div>
+              <div>
                 <span className="text-slate-400 block text-[11px]">Primary Channel</span>
                 <span className="font-semibold text-slate-800 capitalize">{lead.channel_first}</span>
               </div>

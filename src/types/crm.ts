@@ -28,6 +28,31 @@ export interface WorkingHoursDay {
   closed: boolean;
 }
 
+export interface SmtpSettings {
+  enabled: boolean;
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string;
+  password: string;
+  from_name: string;
+  from_email: string;
+  reply_to?: string;
+  test_recipient?: string;
+}
+
+export interface EmailLog {
+  id: string;
+  to: string;
+  subject: string;
+  type: 'welcome' | 'booking_confirmation' | 'reminder' | 'test' | 'custom';
+  status: 'sent' | 'simulated' | 'failed';
+  error?: string;
+  sent_at: string;
+  lead_id?: string;
+  preview_snippet?: string;
+}
+
 export interface ClinicSettings {
   name: string;
   timezone: string; // e.g. "Asia/Dubai"
@@ -47,6 +72,7 @@ export interface ClinicSettings {
   consent_text: string;
   retention_days: number;
   first_response_target_seconds: number;
+  smtp?: SmtpSettings;
 }
 
 export interface Treatment {
@@ -69,6 +95,8 @@ export interface Lead {
   name: string;
   phone: string;
   email?: string;
+  national_id?: string;
+  address?: string;
   language: 'en' | 'ar';
   channel_first: Channel;
   source?: string;
@@ -140,7 +168,14 @@ export interface StaffUser {
 
 export interface ActivityEvent {
   id: string;
-  type: 'lead_new' | 'message_received' | 'appointment_created' | 'appointment_status' | 'handover' | 'followup_sent';
+  type:
+    | 'lead_new'
+    | 'message_received'
+    | 'message_sent'
+    | 'appointment_created'
+    | 'appointment_status'
+    | 'handover'
+    | 'followup_sent';
   title: string;
   description: string;
   timestamp: string;

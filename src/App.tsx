@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CrmProvider, useCrm } from './context/CrmContext.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { TopBar } from './components/TopBar.tsx';
@@ -17,6 +17,13 @@ import { ExternalLink } from 'lucide-react';
 const MainAppContent: React.FC = () => {
   const { activeTab, loading, toastMessage, isAuthenticated } = useCrm();
   const [bookingModalLeadId, setBookingModalLeadId] = useState<string | null>(null);
+
+  // Reset window and container scroll whenever tab changes so screen is always at the top
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const mainEl = document.querySelector('main');
+    if (mainEl) mainEl.scrollTop = 0;
+  }, [activeTab]);
 
   // Direct standalone widget route
   if (typeof window !== 'undefined' && window.location.pathname === '/widget') {

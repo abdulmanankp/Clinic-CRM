@@ -22,8 +22,14 @@ import {
   Lock,
   Shield,
   Users,
+  Mail,
+  Send,
+  Eye,
+  EyeOff,
+  Server,
+  RefreshCw,
 } from 'lucide-react';
-import { Treatment, TreatmentCategory, KBEntry, UserRole } from '../types/crm.ts';
+import { Treatment, TreatmentCategory, KBEntry, UserRole, SmtpSettings } from '../types/crm.ts';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -42,9 +48,50 @@ export const SettingsView: React.FC = () => {
     createStaffUser,
     updateStaffUserRole,
     deleteStaffUser,
+    smtpSettings,
+    emailLogs,
+    updateSmtpConfig,
+    verifySmtp,
+    sendTestEmail,
+    refreshEmailLogs,
   } = useCrm();
 
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'hours' | 'treatments' | 'kb' | 'users' | 'integrations' | 'n8n-prompt' | 'supabase-sql'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<
+    'profile' | 'hours' | 'treatments' | 'kb' | 'users' | 'smtp-email' | 'integrations' | 'n8n-prompt' | 'supabase-sql'
+  >('profile');
+
+  // SMTP Settings Local Form State
+  const [smtpHost, setSmtpHost] = useState(smtpSettings?.host || 'smtp.gmail.com');
+  const [smtpPort, setSmtpPort] = useState(smtpSettings?.port || 587);
+  const [smtpSecure, setSmtpSecure] = useState(smtpSettings?.secure || false);
+  const [smtpUser, setSmtpUser] = useState(smtpSettings?.username || 'concierge.democlinic@gmail.com');
+  const [smtpPassword, setSmtpPassword] = useState(smtpSettings?.password || '');
+  const [smtpFromName, setSmtpFromName] = useState(smtpSettings?.from_name || 'Demo Dental & Aesthetic Clinic (Dubai Marina)');
+  const [smtpFromEmail, setSmtpFromEmail] = useState(smtpSettings?.from_email || 'bookings@democlinic.ae');
+  const [smtpReplyTo, setSmtpReplyTo] = useState(smtpSettings?.reply_to || 'support@democlinic.ae');
+  const [smtpEnabled, setSmtpEnabled] = useState(smtpSettings?.enabled ?? true);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Test Email state
+  const [testRecipient, setTestRecipient] = useState(currentUser.email || 'abdulmanankp0@gmail.com');
+  const [verifyingSmtp, setVerifyingSmtp] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [sendingTest, setSendingTest] = useState(false);
+
+  // Update local states when smtpSettings loads
+  React.useEffect(() => {
+    if (smtpSettings) {
+      setSmtpHost(smtpSettings.host);
+      setSmtpPort(smtpSettings.port);
+      setSmtpSecure(smtpSettings.secure);
+      setSmtpUser(smtpSettings.username);
+      setSmtpPassword(smtpSettings.password || '');
+      setSmtpFromName(smtpSettings.from_name);
+      setSmtpFromEmail(smtpSettings.from_email);
+      setSmtpReplyTo(smtpSettings.reply_to || '');
+      setSmtpEnabled(smtpSettings.enabled);
+    }
+  }, [smtpSettings]);
 
   // User management local state
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -142,6 +189,7 @@ export const SettingsView: React.FC = () => {
     { id: 'hours' as const, label: 'Hours & Capacity', icon: Clock },
     { id: 'treatments' as const, label: 'Treatments', icon: Sparkles },
     { id: 'kb' as const, label: 'Knowledge Base', icon: BookOpen },
+    { id: 'smtp-email' as const, label: 'SMTP Email System', icon: Mail, badge: 'Super Admin' },
     ...(isSuperAdmin
       ? [
           { id: 'users' as const, label: 'Team & Access', icon: Users, badge: 'Super Admin' },
@@ -1520,6 +1568,436 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 1. check_appointment_capacity() -> Prevents double-booking beyond slot_capacity
 -- 2. auto_schedule_appointment_followups() -> Generates reminder_24h, reminder_2h, post_visit (+3h)`}
             </pre>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: SMTP Email System (Super Admin Controlled) */}
+      {activeSubTab === 'smtp-email' && (
+        <div className="p-6 space-y-6 text-xs max-w-5xl">
+          {/* Header & Status Banner */}
+          <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 p-5 rounded-2xl text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <span className="px-2 py-0.5 rounded-full bg-teal-400/20 text-teal-200 border border-teal-400/30 text-[10px] font-extrabold uppercase tracking-wider">
+                  Super Admin Controlled
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  {smtpEnabled ? 'Mail Server Active' : 'Mail Server Disabled'}
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-white">Direct SMTP Email Infrastructure</h3>
+              <p className="text-xs text-teal-100/80 max-w-2xl">
+                Internal email engine for automatic New Patient Welcome Emails, Booking Confirmations with Google Calendar links, and Follow-up Reminders. Works directly or in parallel with n8n workflows.
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={async () => {
+                  setVerifyingSmtp(true);
+                  const res = await verifySmtp({
+                    host: smtpHost,
+                    port: Number(smtpPort),
+                    secure: smtpSecure,
+                    username: smtpUser,
+                    password: smtpPassword,
+                  });
+                  setVerifyResult(res);
+                  setVerifyingSmtp(false);
+                }}
+                disabled={verifyingSmtp}
+                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center space-x-1.5 border border-white/20 transition-all cursor-pointer"
+              >
+                <Server className="w-3.5 h-3.5 text-teal-300" />
+                <span>{verifyingSmtp ? 'Testing Connection...' : 'Test Connection'}</span>
+              </button>
+            </div>
+          </div>
+
+          {verifyResult && (
+            <div
+              className={`p-3.5 rounded-2xl border text-xs flex items-start space-x-2.5 animate-in fade-in-50 ${
+                verifyResult.ok
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : 'bg-rose-50 border-rose-200 text-rose-900'
+              }`}
+            >
+              {verifyResult.ok ? (
+                <Check className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+              ) : (
+                <ShieldAlert className="w-4 h-4 text-rose-600 mt-0.5 flex-shrink-0" />
+              )}
+              <div className="flex-1">
+                <p className="font-bold">{verifyResult.ok ? 'Connection Verified' : 'Connection Warning'}</p>
+                <p className="text-[11px] mt-0.5 leading-relaxed">{verifyResult.message}</p>
+              </div>
+              <button
+                onClick={() => setVerifyResult(null)}
+                className="text-slate-400 hover:text-slate-700 text-xs"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Quick Mail Provider Presets */}
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+              ⚡ Quick Mail Provider Presets (One-Click Setup):
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSmtpHost('smtp.gmail.com');
+                  setSmtpPort(587);
+                  setSmtpSecure(false);
+                  showToast('Gmail preset loaded (Use a Google App Password for 2FA)', 'info');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-bold border border-slate-200 shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+              >
+                <span>📧 Gmail / Google Workspace</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSmtpHost('smtp.sendgrid.net');
+                  setSmtpPort(587);
+                  setSmtpSecure(false);
+                  setSmtpUser('apikey');
+                  showToast('SendGrid preset loaded', 'info');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-bold border border-slate-200 shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+              >
+                <span>⚡ SendGrid</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSmtpHost('smtp.mailgun.org');
+                  setSmtpPort(587);
+                  setSmtpSecure(false);
+                  showToast('Mailgun preset loaded', 'info');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-bold border border-slate-200 shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+              >
+                <span>🚀 Mailgun</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSmtpHost('smtp.office365.com');
+                  setSmtpPort(587);
+                  setSmtpSecure(false);
+                  showToast('Microsoft 365 preset loaded', 'info');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-bold border border-slate-200 shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+              >
+                <span>🏢 Microsoft 365 / Outlook</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSmtpHost('email-smtp.us-east-1.amazonaws.com');
+                  setSmtpPort(587);
+                  setSmtpSecure(false);
+                  showToast('Amazon SES preset loaded', 'info');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-bold border border-slate-200 shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+              >
+                <span>☁️ Amazon SES</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Form Grid */}
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              await updateSmtpConfig({
+                enabled: smtpEnabled,
+                host: smtpHost.trim(),
+                port: Number(smtpPort),
+                secure: smtpSecure,
+                username: smtpUser.trim(),
+                password: smtpPassword,
+                from_name: smtpFromName.trim(),
+                from_email: smtpFromEmail.trim(),
+                reply_to: smtpReplyTo.trim() || undefined,
+              });
+            }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Hostname */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  SMTP Host / Server <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. smtp.gmail.com or mail.yourclinic.com"
+                  value={smtpHost}
+                  onChange={(e) => setSmtpHost(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                  required
+                />
+              </div>
+
+              {/* Port & Security */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Port</label>
+                  <input
+                    type="number"
+                    placeholder="587"
+                    value={smtpPort}
+                    onChange={(e) => setSmtpPort(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Encryption</label>
+                  <select
+                    value={smtpSecure ? 'ssl' : 'tls'}
+                    onChange={(e) => setSmtpSecure(e.target.value === 'ssl')}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                  >
+                    <option value="tls">STARTTLS (Port 587)</option>
+                    <option value="ssl">SSL / TLS (Port 465)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Username / Email */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  SMTP Username / Login Email <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. concierge.democlinic@gmail.com"
+                  value={smtpUser}
+                  onChange={(e) => setSmtpUser(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                  required
+                />
+              </div>
+
+              {/* Password */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">
+                    SMTP Password / App Password <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-slate-400 hover:text-slate-600 text-[11px] flex items-center space-x-1 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    <span>{showPassword ? 'Hide' : 'Show'}</span>
+                  </button>
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter SMTP password or 16-character App Password"
+                  value={smtpPassword}
+                  onChange={(e) => setSmtpPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                  required
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  For Gmail: Generate a 16-character App Password at myaccount.google.com/apppasswords
+                </span>
+              </div>
+
+              {/* Sender Name */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Sender Display Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Demo Dental & Aesthetic Clinic Dubai"
+                  value={smtpFromName}
+                  onChange={(e) => setSmtpFromName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                />
+              </div>
+
+              {/* Sender Email & Reply-To */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">From Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="bookings@democlinic.ae"
+                    value={smtpFromEmail}
+                    onChange={(e) => setSmtpFromEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Reply-To Address</label>
+                  <input
+                    type="email"
+                    placeholder="support@democlinic.ae"
+                    value={smtpReplyTo}
+                    onChange={(e) => setSmtpReplyTo(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Toggle Enable & Submit */}
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-200">
+              <label className="flex items-center space-x-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={smtpEnabled}
+                  onChange={(e) => setSmtpEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500"
+                />
+                <span className="font-bold text-slate-800 text-xs">
+                  Enable Outgoing SMTP Mail Dispatcher
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save SMTP Settings</span>
+              </button>
+            </div>
+          </form>
+
+          {/* Test Email Dispatcher */}
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                <Send className="w-3.5 h-3.5 text-teal-600" />
+                Live SMTP Test Email Dispatcher
+              </span>
+              <span className="text-[10px] text-slate-400">Verifies end-to-end delivery</span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="email"
+                placeholder="Enter recipient email (e.g. abdulmanankp0@gmail.com)"
+                value={testRecipient}
+                onChange={(e) => setTestRecipient(e.target.value)}
+                className="flex-1 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  setSendingTest(true);
+                  await sendTestEmail(testRecipient.trim());
+                  setSendingTest(false);
+                }}
+                disabled={sendingTest || !testRecipient.trim()}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs transition-colors flex items-center justify-center space-x-1.5 shadow-2xs cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{sendingTest ? 'Sending Test...' : 'Send Live Test Email'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Email Activity Log Table */}
+          <div className="space-y-2 pt-2 border-t border-slate-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+                  Recent Email Logs ({emailLogs.length})
+                </h4>
+                <p className="text-[11px] text-slate-400">Live records of sent patient emails</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => refreshEmailLogs()}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center space-x-1 border border-slate-200 transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-3 h-3 text-slate-500" />
+                <span>Refresh Logs</span>
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Type</th>
+                      <th className="py-2.5 px-3">Recipient</th>
+                      <th className="py-2.5 px-3">Subject / Preview</th>
+                      <th className="py-2.5 px-3">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {emailLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-slate-400">
+                          No email dispatches recorded yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      emailLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-2.5 px-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                log.status === 'sent'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : log.status === 'simulated'
+                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}
+                            >
+                              {log.status === 'sent'
+                                ? '✓ SENT LIVE (SMTP)'
+                                : log.status === 'simulated'
+                                ? 'SIMULATED'
+                                : 'FAILED'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="capitalize font-semibold text-slate-700 text-[11px]">
+                              {log.type.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-medium text-slate-800 text-[11px]">
+                            {log.to}
+                          </td>
+                          <td className="py-2.5 px-3 max-w-xs truncate text-slate-600 text-[11px]">
+                            {log.subject}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-400 text-[11px] whitespace-nowrap">
+                            {new Date(log.sent_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}{' '}
+                            • {new Date(log.sent_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}

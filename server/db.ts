@@ -11,7 +11,17 @@ import {
   AppointmentStatus,
   StaffUser,
   UserRole,
+  Channel,
+  SmtpSettings,
+  EmailLog,
 } from '../src/types/crm.ts';
+import {
+  defaultSmtpSettings,
+  emailLogs,
+  dispatchEmail,
+  buildWelcomeEmailHtml,
+  buildBookingConfirmationEmailHtml,
+} from './emailService.ts';
 
 // Initial Clinic Settings
 const defaultSettings: ClinicSettings = {
@@ -193,6 +203,8 @@ class ClinicDatabase {
   appointments: Appointment[] = [];
   followups: Followup[] = [];
   activities: ActivityEvent[] = [];
+  smtp: SmtpSettings = { ...defaultSmtpSettings };
+  email_logs: EmailLog[] = emailLogs;
 
   constructor() {
     this.seedDemoData();
@@ -270,6 +282,198 @@ class ClinicDatabase {
     const removed = this.staff_users.splice(idx, 1)[0];
     this.logActivity('lead_new', `Staff User Deleted: ${removed.name}`, `Email: ${removed.email}`);
     return true;
+  }
+
+  // --- PATIENT CHECK & REGISTRATION ---
+  checkPatientExists(query: { phone?: string; national_id?: string; email?: string; search?: string }): {
+    found: boolean;
+    patient?: Lead;
+    recentAppointments?: Appointment[];
+  } {
+    const rawPhone = (query.phone || query.search || '').replace(/\D/g, '');
+    const cleanId = (query.national_id || query.search || '').trim().toLowerCase();
+    const cleanEmail = (query.email || query.search || '').trim().toLowerCase();
+    const rawSearch = (query.search || '').trim().toLowerCase();
+
+    const patient = this.leads.find((l) => {
+      // 1. Phone match
+      if (rawPhone && rawPhone.length >= 7) {
+        const pDigits = l.phone.replace(/\D/g, '');
+        if (pDigits.includes(rawPhone) || rawPhone.includes(pDigits)) return true;
+      }
+      // 2. National ID match (Emirates ID / National ID)
+      if (cleanId && l.national_id && l.national_id.replace(/[-\s]/g, '').toLowerCase() === cleanId.replace(/[-\s]/g, '')) {
+        return true;
+      }
+      // 3. Email match
+      if (cleanEmail && l.email && l.email.toLowerCase() === cleanEmail) {
+        return true;
+      }
+      // 4. Name match (if search string provided)
+      if (rawSearch && l.name.toLowerCase().includes(rawSearch)) {
+        return true;
+      }
+      return false;
+    });
+
+    if (patient) {
+      const recentAppts = this.appointments
+        .filter((a) => a.lead_id === patient.id)
+        .sort((a, b) => new Date(b.start_at).getTime() - new Date(a.start_at).getTime())
+        .slice(0, 3);
+      return { found: true, patient, recentAppointments: recentAppts };
+    }
+
+    return { found: false };
+  }
+
+  createOrUpdatePatient(data: {
+    name: string;
+    phone: string;
+    national_id?: string;
+    email?: string;
+    address?: string;
+    language?: 'en' | 'ar';
+    channel?: Channel;
+    treatment_interest?: string;
+    send_welcome_email?: boolean;
+    send_welcome_whatsapp?: boolean;
+    source?: string;
+  }): { is_new: boolean; patient: Lead } {
+    const cleanPhone = data.phone.startsWith('+') ? data.phone : '+' + data.phone.replace(/\D/g, '');
+    const nowIso = new Date().toISOString();
+    let existing = this.leads.find(
+      (l) =>
+        l.phone === cleanPhone ||
+        (data.national_id && l.national_id && l.national_id.replace(/[-\s]/g, '') === data.national_id.replace(/[-\s]/g, '')) ||
+        (data.email && l.email && l.email.toLowerCase() === data.email.trim().toLowerCase())
+    );
+
+    if (existing) {
+      // Update details
+      if (data.name) existing.name = data.name;
+      if (data.national_id) existing.national_id = data.national_id;
+      if (data.email) existing.email = data.email.trim().toLowerCase();
+      if (data.address) existing.address = data.address;
+      if (data.treatment_interest) existing.treatment_interest = data.treatment_interest;
+      if (data.language) existing.language = data.language;
+
+      this.logActivity(
+        'lead_new',
+        'Patient Profile Verified / Updated',
+        `${existing.name} (${existing.phone}) profile updated. National ID: ${existing.national_id || 'N/A'}, Address: ${existing.address || 'N/A'}`,
+        existing.id
+      );
+
+      return { is_new: false, patient: existing };
+    }
+
+    // Create brand new patient
+    const newLead: Lead = {
+      id: 'lead-' + Math.random().toString(36).substring(2, 9),
+      name: data.name,
+      phone: cleanPhone,
+      national_id: data.national_id || undefined,
+      email: data.email ? data.email.trim().toLowerCase() : undefined,
+      address: data.address || undefined,
+      language: data.language || 'en',
+      channel_first: data.channel || 'whatsapp',
+      source: data.source || 'Admin Direct Registration',
+      treatment_interest: data.treatment_interest || undefined,
+      status: 'new',
+      consent_at: nowIso,
+      opted_out: false,
+      after_hours: this.isAfterHours(nowIso),
+      first_response_seconds: 15,
+      created_at: nowIso,
+    };
+
+    this.leads.unshift(newLead);
+
+    // Create linked conversation
+    const newConv: Conversation = {
+      id: 'conv-' + Math.random().toString(36).substring(2, 9),
+      lead_id: newLead.id,
+      channel: newLead.channel_first,
+      mode: 'ai',
+      last_message_at: nowIso,
+      unread_count: 0,
+    };
+    this.conversations.unshift(newConv);
+
+    this.logActivity(
+      'lead_new',
+      'New Patient Added',
+      `${newLead.name} (${newLead.phone}) registered. Emirates ID: ${newLead.national_id || 'N/A'}, Address: ${newLead.address || 'N/A'}`,
+      newLead.id
+    );
+
+    // Automated Welcome Email (via SMTP + HTML Template)
+    if (data.send_welcome_email !== false && newLead.email) {
+      const welcomeHtml = buildWelcomeEmailHtml({
+        patientName: newLead.name,
+        clinicName: this.settings.name,
+        phone: newLead.phone,
+        address: newLead.address,
+        emiratesId: newLead.national_id,
+      });
+
+      dispatchEmail(this.smtp, {
+        to: newLead.email,
+        subject: `Welcome to ${this.settings.name} (Registration Confirmed)`,
+        html: welcomeHtml,
+        type: 'welcome',
+        lead_id: newLead.id,
+      }).then((res) => {
+        this.logActivity(
+          'message_sent',
+          res.simulated ? 'Automated Welcome Email Dispatched (Simulated)' : 'Automated Welcome Email Dispatched (SMTP)',
+          `Sent to ${newLead.email} - "Welcome to ${this.settings.name}"`,
+          newLead.id,
+          { to: newLead.email, type: 'welcome_email', simulated: res.simulated }
+        );
+      });
+    }
+
+    // Automated Welcome WhatsApp Message
+    if (data.send_welcome_whatsapp !== false && newLead.phone) {
+      this.logActivity(
+        'message_sent',
+        `Automated Welcome WhatsApp Dispatched`,
+        `Sent to ${newLead.phone} - "Hello ${newLead.name}, welcome to Demo Clinic Dubai Marina concierge. We are delighted to assist you."`,
+        newLead.id,
+        { to: newLead.phone, type: 'welcome_whatsapp' }
+      );
+    }
+
+    // Emit event to n8n webhook (async)
+    this.emitN8nPatientWelcome(newLead);
+
+    return { is_new: true, patient: newLead };
+  }
+
+  emitN8nPatientWelcome(lead: Lead) {
+    const n8nBase = process.env.N8N_BASE_URL || 'https://n8n.wovextech.internal';
+    const n8nApiKey = process.env.N8N_API_KEY || 'n8n_sec_key_67890';
+    const url = `${n8nBase.replace(/\/$/, '')}/webhook/crm-patient-welcome`;
+
+    const payload = {
+      event: 'patient_registered',
+      patient: lead,
+      clinic: this.settings.name,
+      emitted_at: new Date().toISOString(),
+    };
+
+    (async () => {
+      try {
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': n8nApiKey },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(3000),
+        });
+      } catch {}
+    })();
   }
 
   // Helper: check working hours for a given ISO date string
@@ -390,6 +594,45 @@ class ClinicDatabase {
       'Appointment Confirmed',
       `${lead.name} booked for ${new Date(appt.start_at).toLocaleDateString()} (${appt.created_by.toUpperCase()})`,
       lead.id
+    );
+
+    // Automated Booking Confirmation Email (via SMTP + HTML Template)
+    if (lead.email) {
+      const treatmentName = this.treatments.find((t) => t.id === appt.treatment_id)?.name || 'Consultation';
+      const durationMin = this.treatments.find((t) => t.id === appt.treatment_id)?.duration_min || 45;
+      const confirmHtml = buildBookingConfirmationEmailHtml({
+        patientName: lead.name,
+        treatmentName,
+        startAtIso: appt.start_at,
+        durationMin,
+        clinicName: this.settings.name,
+        address: 'Marina Promenade, Al Emreef St, Dubai Marina',
+      });
+
+      dispatchEmail(this.smtp, {
+        to: lead.email,
+        subject: `Appointment Confirmed: ${treatmentName} at ${this.settings.name}`,
+        html: confirmHtml,
+        type: 'booking_confirmation',
+        lead_id: lead.id,
+      }).then((res) => {
+        this.logActivity(
+          'message_sent',
+          res.simulated ? 'Booking Confirmation Email Sent (Simulated)' : 'Booking Confirmation Email Sent (SMTP)',
+          `Sent to ${lead.email} - "${treatmentName} on ${new Date(appt.start_at).toLocaleDateString()}"`,
+          lead.id,
+          { to: lead.email, type: 'appointment_confirmation_email', appointment_id: appt.id, simulated: res.simulated }
+        );
+      });
+    }
+
+    // Automated Booking Confirmation WhatsApp
+    this.logActivity(
+      'message_sent',
+      `WhatsApp Booking Confirmation Sent`,
+      `Sent to ${lead.phone} - "Hello ${lead.name}, your appointment at Demo Dental & Aesthetic Clinic is confirmed for ${new Date(appt.start_at).toLocaleDateString()}."`,
+      lead.id,
+      { to: lead.phone, type: 'appointment_confirmation_whatsapp', appointment_id: appt.id }
     );
 
     // Emit event to n8n webhook (async)

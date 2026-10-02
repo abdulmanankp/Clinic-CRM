@@ -29,7 +29,7 @@ export const WidgetView: React.FC = () => {
   const [handoverActive, setHandoverActive] = useState(false);
   const [sessionId, setSessionId] = useState('');
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Initialize session id from localStorage
   useEffect(() => {
@@ -60,9 +60,11 @@ export const WidgetView: React.FC = () => {
     setMessages([lang === 'ar' ? greetingAr : greetingEn]);
   }, [lang]);
 
-  // Scroll to bottom
+  // Scroll to bottom safely within container (never scroll outer window/topbar)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   }, [messages, isTyping]);
 
   const handleSendMessage = async (e?: React.FormEvent, customText?: string) => {
@@ -196,7 +198,7 @@ export const WidgetView: React.FC = () => {
       </div>
 
       {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
         {messages.map((m) => {
           const isPatient = m.sender === 'patient';
           const isStaff = m.sender === 'staff';
@@ -246,8 +248,6 @@ export const WidgetView: React.FC = () => {
             </span>
           </div>
         )}
-
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Suggested Quick Inquiries */}

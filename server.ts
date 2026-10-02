@@ -23,6 +23,11 @@ import {
   handleStaffSendMessage,
   handleSimulateDemoEnquiry,
 } from './server/webChatProxy.ts';
+import {
+  verifySmtpConnection,
+  dispatchEmail,
+  buildTestEmailHtml,
+} from './server/emailService.ts';
 import { db } from './server/db.ts';
 
 dotenv.config();
@@ -194,6 +199,74 @@ app.delete('/api/staff-users/:id', (req, res) => {
   const { id } = req.params;
   const ok = db.deleteStaffUser(id);
   return res.json({ ok });
+});
+
+// Patient Verification & Registration Endpoints (Emirates/National ID, Phone, Email, Address, Welcome Email)
+app.post('/api/patients/check', (req, res) => {
+  const result = db.checkPatientExists(req.body);
+  return res.json(result);
+});
+
+app.post('/api/patients/create', (req, res) => {
+  const { name, phone } = req.body;
+  if (!name || !phone) {
+    return res.status(400).json({ ok: false, error: 'Patient full name and phone number are required.' });
+  }
+  const result = db.createOrUpdatePatient(req.body);
+  return res.json({ ok: true, ...result });
+});
+
+// --- SUPER ADMIN SMTP EMAIL SYSTEM ROUTES ---
+app.get('/api/smtp/config', (req, res) => {
+  return res.json({ ok: true, smtp: db.smtp });
+});
+
+app.post('/api/smtp/config', (req, res) => {
+  const updates = req.body;
+  db.smtp = {
+    ...db.smtp,
+    ...updates,
+    port: Number(updates.port) || db.smtp.port,
+    secure: updates.secure !== undefined ? Boolean(updates.secure) : db.smtp.secure,
+    enabled: updates.enabled !== undefined ? Boolean(updates.enabled) : db.smtp.enabled,
+  };
+  db.logActivity(
+    'lead_new',
+    'SMTP Email Server Config Updated',
+    `Host: ${db.smtp.host}:${db.smtp.port}, User: ${db.smtp.username}, Status: ${db.smtp.enabled ? 'ACTIVE' : 'DISABLED'}`
+  );
+  return res.json({ ok: true, smtp: db.smtp });
+});
+
+app.post('/api/smtp/verify', async (req, res) => {
+  const config = { ...db.smtp, ...req.body };
+  const result = await verifySmtpConnection(config);
+  return res.json(result);
+});
+
+app.post('/api/smtp/test-send', async (req, res) => {
+  const { to } = req.body;
+  const recipient = to || db.smtp.test_recipient || 'abdulmanankp0@gmail.com';
+  const html = buildTestEmailHtml({
+    adminName: 'Super Admin',
+    host: db.smtp.host,
+    port: db.smtp.port,
+    user: db.smtp.username,
+    clinicName: db.settings.name,
+  });
+
+  const result = await dispatchEmail(db.smtp, {
+    to: recipient,
+    subject: `[Live SMTP Test] ${db.settings.name} Mail Server Verified`,
+    html,
+    type: 'test',
+  });
+
+  return res.json({ ok: result.ok, recipient, result });
+});
+
+app.get('/api/smtp/logs', (req, res) => {
+  return res.json({ ok: true, logs: db.email_logs });
 });
 
 // Update treatment / KB / settings from frontend

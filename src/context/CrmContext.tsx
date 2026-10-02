@@ -13,6 +13,8 @@ import {
   UserRole,
   LeadStatus,
   AppointmentStatus,
+  SmtpSettings,
+  EmailLog,
 } from '../types/crm.ts';
 
 interface CrmContextType {
@@ -25,6 +27,12 @@ interface CrmContextType {
   appointments: Appointment[];
   followups: Followup[];
   activities: ActivityEvent[];
+  smtpSettings: SmtpSettings | null;
+  emailLogs: EmailLog[];
+  updateSmtpConfig: (config: Partial<SmtpSettings>) => Promise<boolean>;
+  verifySmtp: (config?: Partial<SmtpSettings>) => Promise<{ ok: boolean; message: string; error?: string }>;
+  sendTestEmail: (to?: string) => Promise<{ ok: boolean; message?: string }>;
+  refreshEmailLogs: () => Promise<void>;
   currentUser: StaffUser;
   setCurrentUser: (user: StaffUser) => void;
   isAuthenticated: boolean;
@@ -59,6 +67,23 @@ interface CrmContextType {
     channel: string;
     notes?: string;
   }) => Promise<{ ok: boolean; error?: string }>;
+  checkPatient: (query: {
+    phone?: string;
+    national_id?: string;
+    email?: string;
+    search?: string;
+  }) => Promise<{ found: boolean; patient?: Lead; recentAppointments?: Appointment[] }>;
+  registerPatient: (data: {
+    name: string;
+    phone: string;
+    national_id?: string;
+    email?: string;
+    address?: string;
+    language?: 'en' | 'ar';
+    treatment_interest?: string;
+    send_welcome_email?: boolean;
+    send_welcome_whatsapp?: boolean;
+  }) => Promise<{ ok: boolean; patient?: Lead; is_new?: boolean; error?: string }>;
   updateAppointment: (
     apptId: string,
     status?: AppointmentStatus,
@@ -165,11 +190,93 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [smtpSettings, setSmtpSettings] = useState<SmtpSettings | null>(null);
+  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
 
   const showToast = useCallback((text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 4000);
   }, []);
+
+  const refreshSmtp = useCallback(async () => {
+    try {
+      const res = await fetch('/api/smtp/config');
+      if (res.ok) {
+        const data = await res.json();
+        setSmtpSettings(data.smtp);
+      }
+      const logsRes = await fetch('/api/smtp/logs');
+      if (logsRes.ok) {
+        const logsData = await logsRes.json();
+        setEmailLogs(logsData.logs || []);
+      }
+    } catch {}
+  }, []);
+
+  const updateSmtpConfig = async (config: Partial<SmtpSettings>): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/smtp/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSmtpSettings(data.smtp);
+        showToast('SMTP Mail Server settings updated', 'success');
+        return true;
+      }
+      showToast('Failed to update SMTP settings', 'error');
+      return false;
+    } catch {
+      showToast('Error updating SMTP settings', 'error');
+      return false;
+    }
+  };
+
+  const verifySmtp = async (config?: Partial<SmtpSettings>): Promise<{ ok: boolean; message: string; error?: string }> => {
+    try {
+      const res = await fetch('/api/smtp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config || smtpSettings || {}),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Verification failed' };
+    }
+  };
+
+  const sendTestEmail = async (to?: string): Promise<{ ok: boolean; message?: string }> => {
+    try {
+      const res = await fetch('/api/smtp/test-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to }),
+      });
+      const data = await res.json();
+      await refreshEmailLogs();
+      if (data.ok) {
+        showToast(`Test email dispatched to ${data.recipient}`, 'success');
+        return { ok: true, message: `Dispatched to ${data.recipient}` };
+      }
+      showToast(`Test email failed: ${data.result?.error || 'Error'}`, 'error');
+      return { ok: false, message: data.result?.error };
+    } catch (err: any) {
+      return { ok: false, message: err.message };
+    }
+  };
+
+  const refreshEmailLogs = async () => {
+    try {
+      const res = await fetch('/api/smtp/logs');
+      if (res.ok) {
+        const data = await res.json();
+        setEmailLogs(data.logs || []);
+      }
+    } catch {}
+  };
 
   const login = async (email: string, pass: string): Promise<{ ok: boolean; error?: string }> => {
     try {
@@ -243,9 +350,10 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Initial load and periodic refresh (every 4 seconds for live updates)
   useEffect(() => {
     refreshData();
+    refreshSmtp();
     const interval = setInterval(refreshData, 4000);
     return () => clearInterval(interval);
-  }, [refreshData]);
+  }, [refreshData, refreshSmtp]);
 
   // Keep selected conversation valid
   useEffect(() => {
@@ -373,6 +481,61 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { ok: true };
     } catch (err: any) {
       return { ok: false, error: err.message };
+    }
+  };
+
+  const checkPatient = async (query: {
+    phone?: string;
+    national_id?: string;
+    email?: string;
+    search?: string;
+  }) => {
+    try {
+      const res = await fetch('/api/patients/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(query),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+      return { found: false };
+    } catch {
+      return { found: false };
+    }
+  };
+
+  const registerPatient = async (data: {
+    name: string;
+    phone: string;
+    national_id?: string;
+    email?: string;
+    address?: string;
+    language?: 'en' | 'ar';
+    treatment_interest?: string;
+    send_welcome_email?: boolean;
+    send_welcome_whatsapp?: boolean;
+  }) => {
+    try {
+      const res = await fetch('/api/patients/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        return { ok: false, error: result.error || 'Failed to register patient' };
+      }
+      await refreshData();
+      showToast(
+        result.is_new
+          ? `New patient ${result.patient.name} registered (Welcome email & WhatsApp queued)`
+          : `Patient ${result.patient.name} verified & updated`,
+        'success'
+      );
+      return { ok: true, patient: result.patient, is_new: result.is_new };
+    } catch (err: any) {
+      return { ok: false, error: err.message || 'Network error' };
     }
   };
 
@@ -573,12 +736,20 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleConversationMode,
         updateLead,
         createAppointment,
+        checkPatient,
+        registerPatient,
         updateAppointment,
         triggerFollowup,
         upsertTreatment,
         upsertKB,
         deleteKB,
         updateSettings,
+        smtpSettings,
+        emailLogs,
+        updateSmtpConfig,
+        verifySmtp,
+        sendTestEmail,
+        refreshEmailLogs,
         toastMessage,
         showToast,
       }}
