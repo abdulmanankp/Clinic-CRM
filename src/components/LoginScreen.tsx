@@ -12,7 +12,11 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
-export const LoginScreen: React.FC = () => {
+interface LoginScreenProps {
+  onBackToLanding?: () => void;
+}
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToLanding }) => {
   const { login } = useCrm();
 
   const [email, setEmail] = useState('');
@@ -48,6 +52,18 @@ export const LoginScreen: React.FC = () => {
   return (
     <div className="min-h-screen w-full bg-[#f6f8fc] flex items-center justify-center p-4 sm:p-6 lg:p-8 font-sans selection:bg-indigo-100 selection:text-indigo-900">
       <div className="max-w-md w-full">
+        {onBackToLanding && (
+          <div className="mb-4 text-center sm:text-left">
+            <button
+              type="button"
+              onClick={onBackToLanding}
+              className="inline-flex items-center space-x-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs"
+            >
+              <span>← Back to Public Homepage</span>
+            </button>
+          </div>
+        )}
+
         {/* Brand & Clinic Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200 mb-3">

@@ -6,13 +6,15 @@ import {
   Plus,
   Clock,
   Sparkles,
+  Globe,
 } from 'lucide-react';
 
 interface TopBarProps {
   onOpenBookingModal?: () => void;
+  onGoToLanding?: () => void;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ onOpenBookingModal }) => {
+export const TopBar: React.FC<TopBarProps> = ({ onOpenBookingModal, onGoToLanding }) => {
   const { activeTab, setActiveTab, conversations } = useCrm();
 
   const unreadMessagesCount = conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
@@ -79,6 +81,18 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenBookingModal }) => {
             </span>
           )}
         </button>
+
+        {/* Homepage Navigation Button */}
+        {onGoToLanding && (
+          <button
+            onClick={onGoToLanding}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
+            title="View Public Homepage & Features"
+          >
+            <Globe className="w-3.5 h-3.5 text-teal-600" />
+            <span className="hidden md:inline">Homepage</span>
+          </button>
+        )}
 
         {/* Quick New Booking Button */}
         {onOpenBookingModal && (

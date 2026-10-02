@@ -2739,6 +2739,85 @@ app.post("/api/smtp/test-send", async (req, res) => {
 app.get("/api/smtp/logs", (req, res) => {
   return res.json({ ok: true, logs: db.email_logs });
 });
+app.post("/api/demo/request", async (req, res) => {
+  const { name, clinic_name, email, phone, speciality, notes } = req.body;
+  if (!name || !email) {
+    return res.status(400).json({ ok: false, error: "Full name and email are required." });
+  }
+  const newLeadId = "lead-" + Math.random().toString(36).substring(2, 9);
+  const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+  const demoLead = {
+    id: newLeadId,
+    name,
+    phone: phone || "+971500000000",
+    email,
+    language: "en",
+    channel_first: "web",
+    source: "Website Demo Request",
+    treatment_interest: speciality || "General Consultation",
+    status: "new",
+    consent_at: nowIso,
+    opted_out: false,
+    after_hours: false,
+    first_response_seconds: 10,
+    created_at: nowIso
+  };
+  db.leads.unshift(demoLead);
+  db.logActivity(
+    "lead_new",
+    "New Demo Request Received",
+    `${name} from "${clinic_name || "Clinic"}" (${email}) requested a live demo.`,
+    newLeadId
+  );
+  const clientHtml = `
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 24px; color: #1e293b;">
+    <div style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <h2 style="color: #0f766e; margin-top: 0;">Clinic Flow AI Demo Request Confirmed</h2>
+      <p>Dear <strong>${name}</strong>,</p>
+      <p>Thank you for requesting a live consultation and demonstration of <strong>Clinic Flow AI & Healthcare Automation</strong> for <strong>${clinic_name || "your clinic"}</strong>.</p>
+      <p>Our automation engineering team has received your clinic profile. To book an instant 1-on-1 video call directly with our lead automation architect, please select your preferred time slot on Calendly:</p>
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="https://calendly.com/abdulmanankp0/clinic-ai-automation-meeting" style="background-color: #0f766e; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-weight: bold; display: inline-block;">
+          Book 1-on-1 Video Call on Calendly
+        </a>
+      </div>
+      <p style="font-size: 13px; color: #64748b;">Speciality: ${speciality || "General"}<br>Phone / WhatsApp: ${phone || "Not provided"}</p>
+      <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 24px;">Clinic Flow AI \xB7 Dubai Marina \xB7 WhatsApp Automation & n8n Workflows</p>
+    </div>
+  </div>
+  `;
+  await dispatchEmail(db.smtp, {
+    to: email,
+    subject: `Clinic Flow AI Demo Request - ${clinic_name || name}`,
+    html: clientHtml,
+    type: "welcome",
+    lead_id: newLeadId
+  });
+  const adminNotificationHtml = `
+  <div style="font-family: sans-serif; padding: 20px;">
+    <h3>\u{1F680} New Demo Request on Landing Page</h3>
+    <p><strong>Name:</strong> ${name}</p>
+    <p><strong>Clinic:</strong> ${clinic_name || "N/A"}</p>
+    <p><strong>Email:</strong> ${email}</p>
+    <p><strong>Phone:</strong> ${phone || "N/A"}</p>
+    <p><strong>Speciality:</strong> ${speciality || "N/A"}</p>
+    <p><strong>Notes:</strong> ${notes || "None"}</p>
+    <p><strong>Calendly URL:</strong> <a href="https://calendly.com/abdulmanankp0/clinic-ai-automation-meeting">Open Meeting Scheduler</a></p>
+  </div>
+  `;
+  await dispatchEmail(db.smtp, {
+    to: "abdulmanankp0@gmail.com",
+    subject: `[New Lead Alert] Demo Request from ${clinic_name || name} (${email})`,
+    html: adminNotificationHtml,
+    type: "custom",
+    lead_id: newLeadId
+  });
+  return res.json({
+    ok: true,
+    message: "Demo request registered successfully. Confirmation email sent via SMTP.",
+    calendly_url: "https://calendly.com/abdulmanankp0/clinic-ai-automation-meeting"
+  });
+});
 app.post("/api/settings/update", (req, res) => {
   const updates = req.body;
   if (updates.name) db.settings.name = updates.name;

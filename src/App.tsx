@@ -12,18 +12,28 @@ import { UsersManagementView } from './components/UsersManagementView.tsx';
 import { WidgetView } from './components/WidgetView.tsx';
 import { NewAppointmentModal } from './components/NewAppointmentModal.tsx';
 import { LoginScreen } from './components/LoginScreen.tsx';
+import { LandingPage } from './components/LandingPage.tsx';
 import { ExternalLink } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { activeTab, loading, toastMessage, isAuthenticated } = useCrm();
   const [bookingModalLeadId, setBookingModalLeadId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'landing' | 'portal'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('portal') === 'true' || window.location.hash === '#portal') {
+        return 'portal';
+      }
+    }
+    return 'landing';
+  });
 
   // Reset window and container scroll whenever tab changes so screen is always at the top
   useEffect(() => {
     window.scrollTo(0, 0);
     const mainEl = document.querySelector('main');
     if (mainEl) mainEl.scrollTop = 0;
-  }, [activeTab]);
+  }, [activeTab, viewMode]);
 
   // Direct standalone widget route
   if (typeof window !== 'undefined' && window.location.pathname === '/widget') {
@@ -36,16 +46,41 @@ const MainAppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="h-screen w-full bg-[#f6f8fc] flex items-center justify-center">
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 flex flex-col items-center space-y-3">
-          <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xs font-semibold text-slate-600">Loading Clinic Flow Portal...</p>
+      <div className="h-screen w-full bg-[#0a0f1d] flex items-center justify-center">
+        <div className="bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-800 flex flex-col items-center space-y-3">
+          <div className="w-8 h-8 border-3 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs font-semibold text-slate-300">Loading Clinic Flow Portal...</p>
         </div>
       </div>
     );
   }
 
-  // Authentication Gate: show LoginScreen if not authenticated
+  // 1. Landing Page View (Public Homepage with Features, Calendly & SMTP Demo Form)
+  if (viewMode === 'landing') {
+    return (
+      <>
+        {toastMessage && (
+          <div
+            className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded-2xl text-xs font-bold text-white shadow-xl transition-all ${
+              toastMessage.type === 'error'
+                ? 'bg-rose-500'
+                : toastMessage.type === 'info'
+                ? 'bg-indigo-600'
+                : 'bg-emerald-600'
+            }`}
+          >
+            {toastMessage.text}
+          </div>
+        )}
+        <LandingPage
+          onOpenPortal={() => setViewMode('portal')}
+          isAuthenticated={isAuthenticated}
+        />
+      </>
+    );
+  }
+
+  // 2. Authentication Gate: show LoginScreen if not authenticated in portal mode
   if (!isAuthenticated) {
     return (
       <>
@@ -62,7 +97,7 @@ const MainAppContent: React.FC = () => {
             {toastMessage.text}
           </div>
         )}
-        <LoginScreen />
+        <LoginScreen onBackToLanding={() => setViewMode('landing')} />
       </>
     );
   }
@@ -90,7 +125,10 @@ const MainAppContent: React.FC = () => {
       {/* Main Viewport Workspace - Full Screen Height with Clean Scroll */}
       <main className="flex-1 h-full min-h-0 bg-[#f6f8fc] p-3 sm:p-5 lg:p-6 flex flex-col overflow-hidden">
         {/* Top Bar with Page Title and Global Actions */}
-        <TopBar onOpenBookingModal={() => setBookingModalLeadId('new')} />
+        <TopBar
+          onOpenBookingModal={() => setBookingModalLeadId('new')}
+          onGoToLanding={() => setViewMode('landing')}
+        />
 
         {/* Dynamic Tab Body: Inbox is full-height fit-to-screen, other views have dedicated smooth scroll */}
         {activeTab === 'inbox' ? (
