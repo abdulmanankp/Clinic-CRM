@@ -357,7 +357,8 @@ export function handleCreateAppointment(req: Request, res: Response) {
  * -> {ok}
  */
 export function handleUpdateAppointment(req: Request, res: Response) {
-  const { appointment_id, status, new_start } = req.body;
+  const { appointment_id, status, new_start, start } = req.body;
+  const targetStart = new_start || start;
 
   if (!appointment_id) {
     return res.status(400).json({ error: 'appointment_id is required', code: 'missing_id' });
@@ -368,11 +369,11 @@ export function handleUpdateAppointment(req: Request, res: Response) {
     return res.status(404).json({ error: 'Appointment not found', code: 'not_found' });
   }
 
-  if (new_start) {
+  if (targetStart) {
     // Check capacity for new slot
     const trt = db.treatments.find((t) => t.id === appt.treatment_id);
     const duration = trt ? trt.duration_min : 45;
-    const startMs = new Date(new_start).getTime();
+    const startMs = new Date(targetStart).getTime();
     const endMs = startMs + duration * 60 * 1000;
     const capacity = db.settings.slot_capacity || 1;
 
@@ -387,7 +388,7 @@ export function handleUpdateAppointment(req: Request, res: Response) {
       return res.status(409).json({ error: 'New slot is full', code: 'slot_unavailable' });
     }
 
-    db.onAppointmentRescheduled(appointment_id, new_start);
+    db.onAppointmentRescheduled(appointment_id, targetStart);
   }
 
   if (status) {
@@ -398,7 +399,22 @@ export function handleUpdateAppointment(req: Request, res: Response) {
     }
   }
 
-  return res.json({ ok: true });
+  return res.json({ ok: true, appointment_id, status: appt.status, start_at: appt.start_at });
+}
+
+export function handleRescheduleAppointment(req: Request, res: Response) {
+  req.body.new_start = req.body.new_start || req.body.start;
+  return handleUpdateAppointment(req, res);
+}
+
+export function handleCancelAppointment(req: Request, res: Response) {
+  req.body.status = 'cancelled';
+  return handleUpdateAppointment(req, res);
+}
+
+export function handleConfirmAppointment(req: Request, res: Response) {
+  req.body.status = 'confirmed';
+  return handleUpdateAppointment(req, res);
 }
 
 /**

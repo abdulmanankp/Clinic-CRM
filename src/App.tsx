@@ -13,16 +13,20 @@ import { WidgetView } from './components/WidgetView.tsx';
 import { NewAppointmentModal } from './components/NewAppointmentModal.tsx';
 import { LoginScreen } from './components/LoginScreen.tsx';
 import { LandingPage } from './components/LandingPage.tsx';
+import { DeveloperDocsPage } from './components/DeveloperDocsPage.tsx';
 import { ExternalLink } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { activeTab, loading, toastMessage, isAuthenticated } = useCrm();
   const [bookingModalLeadId, setBookingModalLeadId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'landing' | 'portal'>(() => {
+  const [viewMode, setViewMode] = useState<'landing' | 'portal' | 'docs'>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('portal') === 'true' || window.location.hash === '#portal') {
         return 'portal';
+      }
+      if (params.get('docs') === 'true' || window.location.hash === '#docs' || window.location.pathname === '/docs') {
+        return 'docs';
       }
     }
     return 'landing';
@@ -55,7 +59,17 @@ const MainAppContent: React.FC = () => {
     );
   }
 
-  // 1. Landing Page View (Public Homepage with Features, Calendly & SMTP Demo Form)
+  // 1. Developer Documentation & Architecture Page
+  if (viewMode === 'docs') {
+    return (
+      <DeveloperDocsPage
+        onBackToLanding={() => setViewMode('landing')}
+        onOpenPortal={() => setViewMode('portal')}
+      />
+    );
+  }
+
+  // 2. Landing Page View (Public Homepage with Features, Calendly & SMTP Demo Form)
   if (viewMode === 'landing') {
     return (
       <>
@@ -74,13 +88,14 @@ const MainAppContent: React.FC = () => {
         )}
         <LandingPage
           onOpenPortal={() => setViewMode('portal')}
+          onOpenDocs={() => setViewMode('docs')}
           isAuthenticated={isAuthenticated}
         />
       </>
     );
   }
 
-  // 2. Authentication Gate: show LoginScreen if not authenticated in portal mode
+  // 3. Authentication Gate: show LoginScreen if not authenticated in portal mode
   if (!isAuthenticated) {
     return (
       <>

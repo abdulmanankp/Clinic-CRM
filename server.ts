@@ -10,6 +10,9 @@ import {
   handleGetAvailableSlots,
   handleCreateAppointment,
   handleUpdateAppointment,
+  handleRescheduleAppointment,
+  handleCancelAppointment,
+  handleConfirmAppointment,
   handleHandover,
   handleGetClinicSettings,
   handleGetDueFollowups,
@@ -84,13 +87,41 @@ app.post(['/create-appointment', '/api/create-appointment'], (req, res, next) =>
   next();
 }, handleCreateAppointment);
 
-// POST /update-appointment
-app.post(['/update-appointment', '/api/update-appointment'], (req, res, next) => {
+// POST & PATCH /update-appointment
+app.all(['/update-appointment', '/api/update-appointment', '/api/appointments/update'], (req, res, next) => {
+  if (req.method !== 'POST' && req.method !== 'PATCH') return next();
   if (req.headers['x-api-key']) {
     return requireCrmApiKey(req, res, next);
   }
   next();
 }, handleUpdateAppointment);
+
+// POST & PATCH /reschedule-appointment (for n8n CLINIC_RESCHEDULE_URL)
+app.all(['/reschedule-appointment', '/api/reschedule-appointment', '/api/appointments/reschedule'], (req, res, next) => {
+  if (req.method !== 'POST' && req.method !== 'PATCH') return next();
+  if (req.headers['x-api-key']) {
+    return requireCrmApiKey(req, res, next);
+  }
+  next();
+}, handleRescheduleAppointment);
+
+// POST & PATCH /cancel-appointment (for n8n CLINIC_CANCEL_URL)
+app.all(['/cancel-appointment', '/api/cancel-appointment', '/api/appointments/cancel'], (req, res, next) => {
+  if (req.method !== 'POST' && req.method !== 'PATCH') return next();
+  if (req.headers['x-api-key']) {
+    return requireCrmApiKey(req, res, next);
+  }
+  next();
+}, handleCancelAppointment);
+
+// POST & PATCH /confirm-appointment (for n8n CLINIC_CONFIRM_URL)
+app.all(['/confirm-appointment', '/api/confirm-appointment', '/api/appointments/confirm'], (req, res, next) => {
+  if (req.method !== 'POST' && req.method !== 'PATCH') return next();
+  if (req.headers['x-api-key']) {
+    return requireCrmApiKey(req, res, next);
+  }
+  next();
+}, handleConfirmAppointment);
 
 // POST /handover
 app.post(['/handover', '/api/handover'], (req, res, next) => {

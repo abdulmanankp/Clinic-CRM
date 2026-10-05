@@ -10,10 +10,6 @@ import {
   ExternalLink,
   CheckCircle2,
   ArrowRight,
-  Server,
-  Zap,
-  Database,
-  Layers,
   ChevronRight,
   Users,
   Building,
@@ -24,14 +20,22 @@ import {
   Star,
   Check,
   Award,
+  Code2,
+  HeartPulse,
+  UserCheck,
 } from 'lucide-react';
 
 interface LandingPageProps {
   onOpenPortal: () => void;
   isAuthenticated: boolean;
+  onOpenDocs?: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthenticated }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({
+  onOpenPortal,
+  isAuthenticated,
+  onOpenDocs,
+}) => {
   // Demo request form state
   const [formData, setFormData] = useState({
     name: '',
@@ -39,7 +43,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
     email: '',
     phone: '',
     speciality: 'Dental & Cosmetic Dentistry',
-    implementation: 'Full Turnkey (n8n + Supabase + SMTP)',
+    implementation: 'Full Clinic Automation (WhatsApp + Reminders + Email)',
     notes: '',
   });
 
@@ -88,7 +92,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-[#0a0f1d]/85 border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           {/* Logo & Brand */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+          <div
+            className="flex items-center space-x-3 cursor-pointer"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-teal-600 via-teal-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-teal-500/25">
               <span className="text-white font-black text-lg tracking-wider">CF</span>
             </div>
@@ -104,15 +111,30 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
           </div>
 
           {/* Center Links (Desktop) */}
-          <nav className="hidden lg:flex items-center space-x-8 text-xs font-semibold text-slate-300">
-            <a href="#features" className="hover:text-teal-400 transition-colors">Features</a>
-            <a href="#tech-stack" className="hover:text-teal-400 transition-colors">Architecture & n8n</a>
-            <a href="#smtp-system" className="hover:text-teal-400 transition-colors">SMTP Mail Engine</a>
+          <nav className="hidden lg:flex items-center space-x-7 text-xs font-semibold text-slate-300">
+            <a href="#patient-journey" className="hover:text-teal-400 transition-colors">How It Works</a>
+            <a href="#features" className="hover:text-teal-400 transition-colors">Clinic Benefits</a>
+            <a href="#integrations" className="hover:text-teal-400 transition-colors">Connected Ecosystem</a>
             <a href="#demo-form" className="hover:text-teal-400 transition-colors">Request Demo</a>
-            <a href="#video-call" className="hover:text-teal-400 transition-colors flex items-center gap-1.5 text-emerald-400">
+            <a
+              href="#video-call"
+              className="hover:text-teal-400 transition-colors flex items-center gap-1.5 text-emerald-400 font-bold"
+            >
               <Video className="w-3.5 h-3.5" />
               <span>Book Video Call</span>
             </a>
+
+            {/* Developer Docs Link */}
+            {onOpenDocs && (
+              <button
+                onClick={onOpenDocs}
+                className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-teal-300 border border-teal-500/30 text-[11px] font-bold flex items-center space-x-1.5 transition-colors cursor-pointer"
+                title="View API specs, Webhook schemas & n8n architecture"
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>Developer & API Docs</span>
+              </button>
+            )}
           </nav>
 
           {/* Right Action: Dashboard / Portal Button */}
@@ -121,17 +143,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
               href={CALENDLY_URL}
               target="_blank"
               rel="noreferrer"
-              className="hidden sm:inline-flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-colors"
+              className="hidden sm:inline-flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-colors"
             >
               <Video className="w-3.5 h-3.5 text-teal-400" />
-              <span>Calendly Call</span>
+              <span>Consultation Call</span>
             </a>
 
             <button
               onClick={onOpenPortal}
               className="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-teal-500/30 flex items-center space-x-2 transition-all cursor-pointer transform hover:-translate-y-0.5"
             >
-              <span>{isAuthenticated ? 'Open CRM Dashboard' : 'Dashboard / Sign In'}</span>
+              <span>{isAuthenticated ? 'Open CRM Dashboard' : 'Clinic Login'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -139,30 +161,30 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
       </header>
 
       {/* 2. HERO SECTION */}
-      <section className="relative overflow-hidden pt-12 pb-20 sm:pt-20 sm:pb-32">
+      <section className="relative overflow-hidden pt-12 pb-20 sm:pt-20 sm:pb-28">
         {/* Glow ambient background effects */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-teal-500/10 blur-[130px] rounded-full pointer-events-none"></div>
         <div className="absolute top-1/3 right-10 w-[350px] h-[350px] bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-4xl mx-auto space-y-6">
-            {/* Top Pill */}
+            {/* Top Badge */}
             <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/80 text-xs font-bold text-teal-300 shadow-inner">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Next-Gen Clinic Automation · UAE & GCC Ready · Zero Double-Booking</span>
+              <span>24/7 Autonomous Patient Concierge · Dubai & GCC Ready</span>
             </div>
 
             {/* Main Headline */}
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.15]">
-              Autonomous AI Receptionist & Clinical CRM for{' '}
+              Autonomous Patient Acquisition & Intelligent Scheduling for{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-emerald-300 to-teal-200">
-                High-Growth Clinics
+                Premium Clinics
               </span>
             </h1>
 
             {/* Sub-headline */}
             <p className="text-sm sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-              Capture patient inquiries across <strong className="text-white">WhatsApp, Instagram & Web</strong> 24/7. Auto-qualify dental & aesthetic procedures, schedule appointments into live Google Calendar slots, and dispatch <strong className="text-white">direct SMTP booking confirmations</strong> with zero staff overhead.
+              Capture patient inquiries across <strong className="text-white">WhatsApp, Instagram & Your Website</strong> around the clock. Instantly guide treatments, book into live doctor schedules with zero double-booking, and send automated welcome packages without adding front-desk staff.
             </p>
 
             {/* Action Buttons */}
@@ -174,7 +196,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
                 className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-extrabold text-sm shadow-xl shadow-teal-500/25 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5"
               >
                 <Video className="w-4 h-4" />
-                <span>Book 1-on-1 Video Consultation</span>
+                <span>Book 1-on-1 Consultation</span>
               </a>
 
               <a
@@ -182,23 +204,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
                 className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-white font-bold text-sm border border-slate-700 flex items-center justify-center space-x-2 transition-colors"
               >
                 <Mail className="w-4 h-4 text-teal-400" />
-                <span>Request Live Demo (Via SMTP)</span>
+                <span>Request a Clinic Demo</span>
               </a>
 
               <button
                 onClick={onOpenPortal}
                 className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold text-sm border border-white/10 flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
               >
-                <span>Launch CRM Portal</span>
+                <span>Clinic Staff Login</span>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
             </div>
 
-            {/* Trust Badges */}
+            {/* Clinical Trust Metrics */}
             <div className="pt-8 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs text-slate-400 font-medium">
               <div className="flex items-center space-x-1.5">
                 <CheckCircle2 className="w-4 h-4 text-teal-400" />
-                <span>45s Average Response Time</span>
+                <span>Under 45s Patient Response Time</span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <CheckCircle2 className="w-4 h-4 text-teal-400" />
@@ -206,221 +228,254 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
               </div>
               <div className="flex items-center space-x-1.5">
                 <CheckCircle2 className="w-4 h-4 text-teal-400" />
-                <span>English & Arabic Medical Triage</span>
+                <span>English & Arabic Medical Fluency</span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <CheckCircle2 className="w-4 h-4 text-teal-400" />
-                <span>Automated Direct SMTP & n8n</span>
+                <span>Automated Arrival & Follow-Up Reminders</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3. ANIMATED OFFICIAL TECH STACK & INTEGRATIONS */}
-      <section id="tech-stack" className="py-16 bg-[#070b16] border-y border-slate-800/70 relative">
+      {/* 3. THE 4-STEP AUTONOMOUS PATIENT JOURNEY */}
+      <section id="patient-journey" className="py-16 bg-[#070b16] border-y border-slate-800/70 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-teal-400">
-              Enterprise Grade Automation Stack
+              The Modern Clinic Experience
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
-              Engineered with Official Production Integrations
+              How ClinicFlow Automates Your Patient Pipeline
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 mt-2">
-              Every workflow trigger, database lock, and mail dispatch is built on proven healthcare standards.
+              From the first WhatsApp message to completed consultation and post-care follow-up.
             </p>
           </div>
 
-          {/* Interactive Stack Grid with Animations */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {/* 1. n8n */}
-            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 transition-all group hover:-translate-y-1">
-              <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-3 group-hover:scale-110 transition-transform">
-                <Zap className="w-6 h-6 animate-pulse" />
+          {/* 4 Step Visual Flow */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Step 1 */}
+            <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 relative hover:border-teal-500/50 transition-all">
+              <div className="w-8 h-8 rounded-full bg-teal-500/20 text-teal-400 font-bold text-xs flex items-center justify-center mb-4">
+                01
               </div>
-              <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
-                <span>n8n</span>
-                <span className="text-[10px] text-rose-400 bg-rose-500/10 px-1.5 rounded">Flows</span>
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                Visual webhook orchestration & CRM webhooks
+              <h3 className="font-bold text-sm text-white mb-1.5">Instant Patient Engagement</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Patients message your clinic on WhatsApp, Instagram DM, or Website Chat. The AI greets them immediately in English or Arabic.
               </p>
             </div>
 
-            {/* 2. Supabase */}
-            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 transition-all group hover:-translate-y-1">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-110 transition-transform">
-                <Database className="w-6 h-6" />
+            {/* Step 2 */}
+            <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 relative hover:border-teal-500/50 transition-all">
+              <div className="w-8 h-8 rounded-full bg-teal-500/20 text-teal-400 font-bold text-xs flex items-center justify-center mb-4">
+                02
               </div>
-              <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
-                <span>Supabase</span>
-                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 rounded">SQL</span>
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                PostgreSQL with RLS & double-booking triggers
+              <h3 className="font-bold text-sm text-white mb-1.5">Clinical Guidance & Triage</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Explains treatments (Whitening, Veneers, Botox, Hydrafacial), quotes price guidelines, and answers questions using your approved guidelines.
               </p>
             </div>
 
-            {/* 3. Direct SMTP */}
-            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 transition-all group hover:-translate-y-1">
-              <div className="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 mb-3 group-hover:scale-110 transition-transform">
-                <Mail className="w-6 h-6" />
+            {/* Step 3 */}
+            <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 relative hover:border-teal-500/50 transition-all">
+              <div className="w-8 h-8 rounded-full bg-teal-500/20 text-teal-400 font-bold text-xs flex items-center justify-center mb-4">
+                03
               </div>
-              <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
-                <span>Direct SMTP</span>
-                <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 rounded">Mail</span>
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                Internal Nodemailer TLS engine with live verification
+              <h3 className="font-bold text-sm text-white mb-1.5">Conflict-Free Booking</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Presents real-time available doctor slots. Locks the chair directly in your schedule with guaranteed zero double-booking.
               </p>
             </div>
 
-            {/* 4. WhatsApp Business */}
-            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-green-500/50 transition-all group hover:-translate-y-1">
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-400 mb-3 group-hover:scale-110 transition-transform">
-                <MessageSquare className="w-6 h-6" />
+            {/* Step 4 */}
+            <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 relative hover:border-teal-500/50 transition-all">
+              <div className="w-8 h-8 rounded-full bg-teal-500/20 text-teal-400 font-bold text-xs flex items-center justify-center mb-4">
+                04
               </div>
-              <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
-                <span>WhatsApp</span>
-                <span className="text-[10px] text-green-400 bg-green-500/10 px-1.5 rounded">Meta</span>
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                Cloud Webhook, instant replies & reminder dispatch
-              </p>
-            </div>
-
-            {/* 5. Google Calendar */}
-            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-blue-500/50 transition-all group hover:-translate-y-1">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-110 transition-transform">
-                <Calendar className="w-6 h-6" />
-              </div>
-              <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
-                <span>Calendar</span>
-                <span className="text-[10px] text-blue-400 bg-blue-500/10 px-1.5 rounded">Sync</span>
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                Real-time doctor calendar slot locking & capacity checks
-              </p>
-            </div>
-
-            {/* 6. Calendly Video Call */}
-            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-purple-500/50 transition-all group hover:-translate-y-1">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-3 group-hover:scale-110 transition-transform">
-                <Video className="w-6 h-6" />
-              </div>
-              <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
-                <span>Calendly</span>
-                <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 rounded">Video</span>
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                Direct 1-on-1 meeting scheduler with Abdul Manan
+              <h3 className="font-bold text-sm text-white mb-1.5">Welcome Pack & Reminders</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Dispatches branded welcome email with valet parking guide, 24h & 2h arrival reminders, and 3-hour post-treatment review check-ins.
               </p>
             </div>
           </div>
 
-          {/* Workflow Architecture Strip */}
-          <div className="mt-8 p-4 rounded-2xl bg-slate-900/40 border border-slate-800 text-xs font-mono text-slate-400 flex flex-wrap items-center justify-center gap-3">
-            <span className="text-teal-400 font-bold">Live Endpoints:</span>
-            <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-300">POST /webhook/crm-appointment-event</span>
-            <span className="text-slate-600">→</span>
-            <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-300">POST /webhook/crm-patient-welcome</span>
-            <span className="text-slate-600">→</span>
-            <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-300">POST /api/smtp/verify</span>
-            <span className="text-slate-600">→</span>
-            <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-300">POST /api/demo/request</span>
-          </div>
+          {/* Sub-banner for developers */}
+          {onOpenDocs && (
+            <div className="mt-8 p-3.5 rounded-2xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between flex-wrap gap-3 text-xs">
+              <div className="flex items-center space-x-2 text-slate-300">
+                <Code2 className="w-4 h-4 text-teal-400 flex-shrink-0" />
+                <span>
+                  Looking for technical webhook schemas, n8n workflow JSON, and REST API documentation?
+                </span>
+              </div>
+              <button
+                onClick={onOpenDocs}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 font-bold border border-slate-700 transition-colors cursor-pointer flex items-center space-x-1"
+              >
+                <span>Open Developer & API Docs</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* 4. CORE CLINICAL FEATURES SHOWCASE */}
+      {/* 4. CORE CLINICAL FEATURES */}
       <section id="features" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <span className="text-[11px] font-extrabold uppercase tracking-widest text-teal-400">
-            Unrivaled Operational Excellence
+            Engineered for Patient Delight & Clinic Efficiency
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-1">
-            Built Specifically for High-End Clinics & Hospitals
+            Everything Your Clinic Needs to Scale Patient Volume
           </h2>
           <p className="text-sm text-slate-400 mt-3">
-            Eliminate missed calls, patient no-shows, and manual receptionist chaos forever.
+            Say goodbye to missed calls, delayed replies, and patient no-shows.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Card 1: WhatsApp & Omnichannel */}
+          {/* Card 1 */}
           <div className="p-7 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all">
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mb-5">
               <MessageSquare className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">Omnichannel Patient Concierge</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Omnichannel WhatsApp Concierge</h3>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Patients chat on WhatsApp, Instagram, or your website. The AI concierge explains procedures (Zoom Teeth Whitening, Veneers, Hydrafacial), quotes price guidelines, and answers clinic FAQs in fluent English or Arabic.
+              Engage prospective patients on their preferred channel. The AI answers treatment questions, explains pricing, and guides bookings around the clock without keeping patients on hold.
             </p>
           </div>
 
-          {/* Card 2: Slot Locking & Capacity */}
+          {/* Card 2 */}
           <div className="p-7 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all">
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-5">
               <Calendar className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Zero Double-Booking Guarantee</h3>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Database-level concurrency triggers block overlapping slots beyond your doctor’s <code className="text-teal-300">slot_capacity</code>. AI and human receptionists can never accidentally schedule two patients at the same chair.
+              Real-time doctor calendar integration guarantees chairs are never overbooked. The AI instantly locks approved slots, ensuring your doctors and treatment rooms operate at optimal capacity.
             </p>
           </div>
 
-          {/* Card 3: Direct SMTP Email System */}
+          {/* Card 3 */}
           <div className="p-7 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all">
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mb-5">
               <Mail className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">Built-in Direct SMTP Engine</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Branded Clinic Welcome Packages</h3>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Super Admin controls your clinic's own mail server (Gmail, SendGrid, Mailgun, Amazon SES). Sends automated HTML welcome emails with valet parking guides, and Google Calendar booking confirmations.
+              Every newly registered patient automatically receives a luxury HTML welcome email with doctor credentials, clinic video walk-through, Google Maps navigation, and valet parking instructions.
             </p>
           </div>
 
-          {/* Card 4: Automated Retention & Follow-ups */}
+          {/* Card 4 */}
           <div className="p-7 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all">
             <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mb-5">
               <Clock className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">Automated Retention Loops</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Automated No-Show Protection</h3>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Auto-schedules 24h & 2h WhatsApp reminders to slash no-shows. Dispatches post-treatment follow-up 3 hours after the visit to ensure comfort and collect Google Reviews.
+              Automated 24h & 2h WhatsApp reminders prompt patients to confirm, reschedule, or ask questions with one tap, reducing last-minute cancellations and empty chairs by up to 65%.
             </p>
           </div>
 
-          {/* Card 5: Staff Handover */}
+          {/* Card 5 */}
           <div className="p-7 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all">
             <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-5">
               <Users className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">1-Click Human Handover</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Seamless Front-Desk Handover</h3>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Staff can pause AI for any patient with one click to step in for complex medical queries, discounts, or VIP requests. The AI gracefully steps back until reactivated.
+              When a patient requests to speak with a human or has complex medical requirements, your reception team is notified instantly. Staff can step into the chat with a single click.
             </p>
           </div>
 
-          {/* Card 6: Super Admin Security */}
+          {/* Card 6 */}
           <div className="p-7 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-5">
               <Shield className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">Super Admin Governance</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Hospital-Grade Privacy & Control</h3>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Fine-grained Role-Based Access Control (Super Admin, Admin, Staff). Secure database-authenticated sessions, private audit logs, and complete control over clinic operating hours and rules.
+              Role-based permissions for Super Admins, Doctors, and Receptionists. Patient data is encrypted, compliant with healthcare data protection standards, and 100% private to your practice.
             </p>
           </div>
         </div>
       </section>
 
-      {/* 5. 1-ON-1 VIDEO CALL SECTION (CALENDLY INTEGRATION) */}
+      {/* 5. CONNECTED CLINIC ECOSYSTEM */}
+      <section id="integrations" className="py-16 bg-[#070b16] border-y border-slate-800/70">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-teal-400">
+              Effortless Synchronization
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
+              Connects with Your Existing Clinic Tools
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-400 mt-2">
+              Works harmoniously alongside your daily calendars, messaging channels, and front-desk workflows.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-green-500/10 text-green-400 flex items-center justify-center mx-auto">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <h4 className="font-bold text-xs text-white">WhatsApp Business</h4>
+              <p className="text-[10px] text-slate-400">Official Cloud Messaging</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <h4 className="font-bold text-xs text-white">Doctor Calendars</h4>
+              <p className="text-[10px] text-slate-400">Google & Apple Calendar</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto">
+                <Mail className="w-5 h-5" />
+              </div>
+              <h4 className="font-bold text-xs text-white">Clinic Email</h4>
+              <p className="text-[10px] text-slate-400">Custom Domain Mail</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
+                <Video className="w-5 h-5" />
+              </div>
+              <h4 className="font-bold text-xs text-white">Calendly Video</h4>
+              <p className="text-[10px] text-slate-400">Consultation Bookings</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto">
+                <Globe className="w-5 h-5" />
+              </div>
+              <h4 className="font-bold text-xs text-white">Website Chatbot</h4>
+              <p className="text-[10px] text-slate-400">Interactive Web Widget</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
+                <HeartPulse className="w-5 h-5" />
+              </div>
+              <h4 className="font-bold text-xs text-white">Practice Records</h4>
+              <p className="text-[10px] text-slate-400">Central Patient History</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. 1-ON-1 VIDEO CALL (CALENDLY) */}
       <section id="video-call" className="py-20 bg-gradient-to-b from-[#070b16] to-[#0a0f1d] border-t border-slate-800 relative">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="rounded-3xl bg-gradient-to-r from-teal-950 via-slate-900 to-slate-900 p-8 sm:p-12 border border-teal-500/30 shadow-2xl relative overflow-hidden">
-            {/* Ambient background badge */}
             <div className="absolute -right-10 -bottom-10 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
@@ -435,21 +490,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
                 </h2>
 
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Have specific integration requirements for your clinic? Schedule a dedicated 30-minute video session to review your EHR/EMR, n8n workflows, WhatsApp business setup, and Supabase database architecture.
+                  Have unique operational requirements or specific booking workflows for your clinic? Schedule a dedicated 30-minute video session to discuss your clinic's patient volume, existing systems, and tailored rollout roadmap.
                 </p>
 
                 <div className="space-y-2 pt-2 text-xs text-slate-300">
                   <div className="flex items-center space-x-2">
                     <Check className="w-4 h-4 text-teal-400 flex-shrink-0" />
-                    <span>Live Architecture Walkthrough (n8n + WhatsApp + SMTP)</span>
+                    <span>Clinic Patient Acquisition & Conversion Review</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Check className="w-4 h-4 text-teal-400 flex-shrink-0" />
-                    <span>Custom EHR & Calendar Synchronization Strategy</span>
+                    <span>Doctor Calendar & Chair Capacity Strategy</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Check className="w-4 h-4 text-teal-400 flex-shrink-0" />
-                    <span>Direct Q&A with Lead Architect Abdul Manan</span>
+                    <span>Direct Q&A with Lead Automation Architect Abdul Manan</span>
                   </div>
                 </div>
 
@@ -512,18 +567,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
         </div>
       </section>
 
-      {/* 6. INTERACTIVE DEMO REQUEST FORM (LINKED TO DIRECT SMTP ENGINE) */}
+      {/* 7. INTERACTIVE DEMO REQUEST FORM */}
       <section id="demo-form" className="py-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-8 sm:p-12 shadow-2xl relative">
           <div className="text-center max-w-2xl mx-auto mb-10">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-teal-400">
-              Direct SMTP Connected Intake
+              Personalized Demonstration
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
-              Request an Interactive Clinic Flow AI Demo
+              Request an Interactive ClinicFlow Walkthrough
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 mt-2">
-              Submit your clinic profile below. Our internal SMTP mail server will instantly dispatch your confirmation email and meeting details.
+              Share a few details about your clinic. You will receive an instant confirmation email and direct meeting access.
             </p>
           </div>
 
@@ -532,9 +587,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
               <div className="w-14 h-14 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center mx-auto text-2xl">
                 ✓
               </div>
-              <h3 className="text-xl font-bold text-white">Demo Request Received!</h3>
+              <h3 className="text-xl font-bold text-white">Demo Request Confirmed!</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Thank you, <strong>{formData.name}</strong>. An automated confirmation email has been dispatched via our <strong>CRM SMTP Engine</strong> to <strong>{formData.email}</strong>.
+                Thank you, <strong>{formData.name}</strong>. An automated confirmation email has been sent to <strong>{formData.email}</strong>.
               </p>
               <div className="pt-2">
                 <a
@@ -544,7 +599,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
                   className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold text-xs inline-flex items-center justify-center space-x-2 shadow-lg"
                 >
                   <Video className="w-4 h-4" />
-                  <span>Book Your Video Call on Calendly Now</span>
+                  <span>Choose Your Video Call Slot on Calendly</span>
                 </a>
               </div>
               <button
@@ -581,7 +636,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
                 {/* Clinic Name */}
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">
-                    Clinic / Hospital Name
+                    Clinic / Practice Name
                   </label>
                   <input
                     type="text"
@@ -595,7 +650,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
                 {/* Work Email */}
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">
-                    Work Email (SMTP Dispatched) <span className="text-rose-400">*</span>
+                    Work Email <span className="text-rose-400">*</span>
                   </label>
                   <input
                     type="email"
@@ -637,27 +692,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
                   </select>
                 </div>
 
-                {/* Implementation */}
+                {/* Growth Priorities */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Architecture Preference</label>
+                  <label className="block text-slate-300 font-bold mb-1">Main Clinic Goal</label>
                   <select
                     value={formData.implementation}
                     onChange={(e) => setFormData({ ...formData, implementation: e.target.value })}
                     className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                   >
-                    <option value="Full Turnkey (n8n + Supabase + SMTP)">Full Turnkey (n8n + Supabase + SMTP)</option>
-                    <option value="WhatsApp AI Receptionist Only">WhatsApp AI Receptionist Only</option>
-                    <option value="Self-Hosted / Private Cloud">Self-Hosted / Private Cloud</option>
+                    <option value="Full Clinic Automation (WhatsApp + Reminders + Email)">Full Automation (WhatsApp + Reminders + Email)</option>
+                    <option value="24/7 WhatsApp Patient Receptionist">24/7 WhatsApp Patient Receptionist</option>
+                    <option value="Eliminating Patient No-Shows & Double Bookings">Eliminating Patient No-Shows & Double Bookings</option>
+                    <option value="Custom Practice System Integration">Custom Practice System Integration</option>
                   </select>
                 </div>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Questions or Current EMR / Calendar Setup</label>
+                <label className="block text-slate-300 font-bold mb-1">Specific Goals or Questions</label>
                 <textarea
                   rows={3}
-                  placeholder="Tell us about your current patient booking setup or specific workflows you'd like to automate..."
+                  placeholder="Tell us about your current booking process or specific areas you want to automate..."
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -671,32 +727,41 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
                 className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-extrabold text-sm shadow-xl shadow-teal-500/25 flex items-center justify-center space-x-2 transition-all cursor-pointer"
               >
                 <Send className="w-4 h-4" />
-                <span>{submitting ? 'Submitting & Dispatching SMTP...' : 'Submit Demo Request & Trigger SMTP Email'}</span>
+                <span>{submitting ? 'Submitting Request...' : 'Schedule My Clinic Demo'}</span>
               </button>
             </form>
           )}
         </div>
       </section>
 
-      {/* 7. FOOTER */}
+      {/* 8. FOOTER */}
       <footer className="py-12 bg-[#050811] border-t border-slate-800/80 text-xs text-slate-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-xl bg-teal-600 flex items-center justify-center text-white font-extrabold">
               CF
             </div>
-            <span className="font-extrabold text-white text-sm">Clinic Flow AI CRM</span>
+            <span className="font-extrabold text-white text-sm">Clinic Flow AI</span>
             <span className="text-slate-600">|</span>
-            <span>Healthcare Automation Architecture</span>
+            <span>Healthcare Patient Acquisition & Scheduling</span>
           </div>
 
           <div className="flex items-center space-x-6 text-[11px]">
+            {onOpenDocs && (
+              <button
+                onClick={onOpenDocs}
+                className="text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>Developer & API Hub</span>
+              </button>
+            )}
             <a href={CALENDLY_URL} target="_blank" rel="noreferrer" className="hover:text-teal-400 flex items-center gap-1">
               <Video className="w-3 h-3" />
-              <span>Calendly Meeting</span>
+              <span>Consultation Meeting</span>
             </a>
             <button onClick={onOpenPortal} className="hover:text-teal-400 font-bold text-white cursor-pointer">
-              Launch Portal Login
+              Clinic Staff Login
             </button>
           </div>
         </div>
@@ -710,7 +775,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenPortal, isAuthen
               <div className="flex items-center space-x-2">
                 <Video className="w-4 h-4 text-teal-400" />
                 <span className="font-bold text-white text-xs sm:text-sm">
-                  Clinic AI Automation Strategy Meeting (Calendly)
+                  Clinic Consultation Strategy Meeting (Calendly)
                 </span>
               </div>
               <button

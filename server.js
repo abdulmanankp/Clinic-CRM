@@ -1870,7 +1870,8 @@ function handleCreateAppointment(req, res) {
   });
 }
 function handleUpdateAppointment(req, res) {
-  const { appointment_id, status, new_start } = req.body;
+  const { appointment_id, status, new_start, start } = req.body;
+  const targetStart = new_start || start;
   if (!appointment_id) {
     return res.status(400).json({ error: "appointment_id is required", code: "missing_id" });
   }
@@ -1878,10 +1879,10 @@ function handleUpdateAppointment(req, res) {
   if (!appt) {
     return res.status(404).json({ error: "Appointment not found", code: "not_found" });
   }
-  if (new_start) {
+  if (targetStart) {
     const trt = db.treatments.find((t) => t.id === appt.treatment_id);
     const duration = trt ? trt.duration_min : 45;
-    const startMs = new Date(new_start).getTime();
+    const startMs = new Date(targetStart).getTime();
     const endMs = startMs + duration * 60 * 1e3;
     const capacity = db.settings.slot_capacity || 1;
     const overlapping = db.appointments.filter((a) => {
@@ -1893,7 +1894,7 @@ function handleUpdateAppointment(req, res) {
     if (overlapping.length >= capacity) {
       return res.status(409).json({ error: "New slot is full", code: "slot_unavailable" });
     }
-    db.onAppointmentRescheduled(appointment_id, new_start);
+    db.onAppointmentRescheduled(appointment_id, targetStart);
   }
   if (status) {
     if (status === "cancelled") {
@@ -1902,7 +1903,19 @@ function handleUpdateAppointment(req, res) {
       db.onAppointmentStatusChange(appointment_id, status);
     }
   }
-  return res.json({ ok: true });
+  return res.json({ ok: true, appointment_id, status: appt.status, start_at: appt.start_at });
+}
+function handleRescheduleAppointment(req, res) {
+  req.body.new_start = req.body.new_start || req.body.start;
+  return handleUpdateAppointment(req, res);
+}
+function handleCancelAppointment(req, res) {
+  req.body.status = "cancelled";
+  return handleUpdateAppointment(req, res);
+}
+function handleConfirmAppointment(req, res) {
+  req.body.status = "confirmed";
+  return handleUpdateAppointment(req, res);
 }
 function handleHandover(req, res) {
   const { lead_id, reason } = req.body;
@@ -2599,12 +2612,34 @@ app.post(["/create-appointment", "/api/create-appointment"], (req, res, next) =>
   }
   next();
 }, handleCreateAppointment);
-app.post(["/update-appointment", "/api/update-appointment"], (req, res, next) => {
+app.all(["/update-appointment", "/api/update-appointment", "/api/appointments/update"], (req, res, next) => {
+  if (req.method !== "POST" && req.method !== "PATCH") return next();
   if (req.headers["x-api-key"]) {
     return requireCrmApiKey(req, res, next);
   }
   next();
 }, handleUpdateAppointment);
+app.all(["/reschedule-appointment", "/api/reschedule-appointment", "/api/appointments/reschedule"], (req, res, next) => {
+  if (req.method !== "POST" && req.method !== "PATCH") return next();
+  if (req.headers["x-api-key"]) {
+    return requireCrmApiKey(req, res, next);
+  }
+  next();
+}, handleRescheduleAppointment);
+app.all(["/cancel-appointment", "/api/cancel-appointment", "/api/appointments/cancel"], (req, res, next) => {
+  if (req.method !== "POST" && req.method !== "PATCH") return next();
+  if (req.headers["x-api-key"]) {
+    return requireCrmApiKey(req, res, next);
+  }
+  next();
+}, handleCancelAppointment);
+app.all(["/confirm-appointment", "/api/confirm-appointment", "/api/appointments/confirm"], (req, res, next) => {
+  if (req.method !== "POST" && req.method !== "PATCH") return next();
+  if (req.headers["x-api-key"]) {
+    return requireCrmApiKey(req, res, next);
+  }
+  next();
+}, handleConfirmAppointment);
 app.post(["/handover", "/api/handover"], (req, res, next) => {
   if (req.headers["x-api-key"]) {
     return requireCrmApiKey(req, res, next);
